@@ -1,0 +1,12 @@
+node_modules
+.next
+.turbo
+.git
+*.md
+.DS_Store
+.env
+.env.*
+!.env.example
+*.log
+.vscode/
+.idea/
