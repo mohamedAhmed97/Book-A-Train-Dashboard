@@ -1,8 +1,13 @@
 "use client";
 import { useState } from "react";
+import { useTranslations } from "next-intl";
+import { Users } from "lucide-react";
 import { trpc } from "@/lib/trpc";
+import { PageHero } from "@/components/PageHero";
 
 export default function AthletesPage() {
+  const t = useTranslations("athletes");
+  const tCommon = useTranslations("common");
   const utils = trpc.useUtils();
   const { data: athletes, isLoading } = trpc.athletes.list.useQuery();
   const { data: stats } = trpc.profile.coachStats.useQuery();
@@ -19,17 +24,18 @@ export default function AthletesPage() {
 
   return (
     <div className="p-7">
-      <div className="flex items-center justify-between mb-7">
-        <h1 className="text-txt font-bold text-2xl">Athletes</h1>
-        <span className="text-txt2 text-sm">
-          {stats?.athleteCount ?? 0} / {stats?.athleteLimit ?? 5} slots used
-        </span>
-      </div>
+      <PageHero
+        tone="primary"
+        icon={Users}
+        eyebrow={t("rosterCapacity")}
+        title={t("title")}
+        subtitle={t("slotsUsed", { used: stats?.athleteCount ?? 0, limit: stats?.athleteLimit ?? 5 })}
+      />
 
       {/* Subscription meter */}
       <div className="bg-bg2 border border-bg5 rounded-2xl p-5 mb-6">
         <div className="flex justify-between items-center mb-3">
-          <h2 className="text-txt font-bold text-sm">Roster Capacity</h2>
+          <h2 className="text-txt font-bold text-sm">{t("rosterCapacity")}</h2>
           <span className="text-amber text-xs bg-amber/10 border border-amber/25 rounded-full px-3 py-1">
             {stats?.subscriptionTier ?? "FREE"}
           </span>
@@ -39,18 +45,18 @@ export default function AthletesPage() {
             style={{ width: `${((stats?.athleteCount ?? 0) / (stats?.athleteLimit ?? 5)) * 100}%` }} />
         </div>
         <div className="flex justify-between text-txt3 text-xs">
-          <span>{stats?.athleteCount ?? 0} athletes</span>
-          <span>{stats?.athleteLimit ?? 5} max</span>
+          <span>{t("athletesCount", { count: stats?.athleteCount ?? 0 })}</span>
+          <span>{stats?.athleteLimit ?? 5} {tCommon("max")}</span>
         </div>
       </div>
 
       {/* Add athlete */}
       <div className="bg-bg2 border border-bg5 rounded-2xl p-5 mb-6">
-        <h2 className="text-txt font-bold text-sm mb-4">Add Athlete by Email</h2>
+        <h2 className="text-txt font-bold text-sm mb-4">{t("addByEmail")}</h2>
         <div className="flex gap-3">
           <input
             className="flex-1 bg-bg3 border border-bg5 rounded-xl px-4 py-2.5 text-txt text-sm outline-none focus:border-primary-light transition-colors placeholder-txt3"
-            placeholder="athlete@example.com"
+            placeholder={t("emailPlaceholder")}
             value={email}
             onChange={(e) => { setEmail(e.target.value); setError(""); }}
           />
@@ -59,7 +65,7 @@ export default function AthletesPage() {
             disabled={add.isPending || !email}
             className="bg-primary text-white rounded-xl px-5 py-2.5 text-sm font-semibold hover:bg-primary-dark transition-colors disabled:opacity-50"
           >
-            {add.isPending ? "Adding..." : "Add"}
+            {add.isPending ? tCommon("adding") : tCommon("add")}
           </button>
         </div>
         {error && <p className="text-coral text-xs mt-2">{error}</p>}
@@ -68,15 +74,15 @@ export default function AthletesPage() {
       {/* Athletes table */}
       <div className="bg-bg2 border border-bg5 rounded-2xl overflow-hidden">
         <div className="grid grid-cols-5 px-5 py-3 border-b border-bg5 text-txt3 text-[10px] tracking-widest">
-          <span className="col-span-2">ATHLETE</span>
-          <span>SPORT</span>
-          <span>SESSIONS</span>
-          <span>ACTIONS</span>
+          <span className="col-span-2">{t("thAthlete")}</span>
+          <span>{t("thSport")}</span>
+          <span>{t("thSessions")}</span>
+          <span>{t("thActions")}</span>
         </div>
 
-        {isLoading && <p className="text-txt2 text-sm text-center py-10">Loading...</p>}
+        {isLoading && <p className="text-txt2 text-sm text-center py-10">{tCommon("loading")}</p>}
         {!isLoading && athletes?.length === 0 && (
-          <p className="text-txt3 text-sm text-center py-10">No athletes yet. Add one above.</p>
+          <p className="text-txt3 text-sm text-center py-10">{t("empty")}</p>
         )}
 
         {athletes?.map((ca) => (
@@ -96,7 +102,7 @@ export default function AthletesPage() {
               onClick={() => remove.mutate({ athleteProfileId: ca.athlete.id })}
               className="text-coral text-xs hover:underline w-fit"
             >
-              Remove
+              {tCommon("remove")}
             </button>
           </div>
         ))}

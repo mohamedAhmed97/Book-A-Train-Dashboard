@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { trpc } from "@/lib/trpc";
 
 interface ExerciseDraft {
@@ -15,6 +16,8 @@ interface ExerciseDraft {
 const EMPTY_EXERCISE: ExerciseDraft = { name: "", sets: "", reps: "", durationSeconds: "", restSeconds: "", notes: "" };
 
 export default function NewSessionPage() {
+  const t = useTranslations("sessionForm");
+  const tCommon = useTranslations("common");
   const router = useRouter();
   const utils = trpc.useUtils();
   const { data: athletes } = trpc.athletes.list.useQuery();
@@ -46,7 +49,7 @@ export default function NewSessionPage() {
     setError("");
 
     if (!form.title || !form.sport || !form.scheduledAt) {
-      setError("Title, sport and date are required");
+      setError(t("errorRequired"));
       return;
     }
 
@@ -82,7 +85,7 @@ export default function NewSessionPage() {
       utils.sessions.mySessions.invalidate();
       router.push("/dashboard/sessions");
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to create session");
+      setError(err instanceof Error ? err.message : t("errorCreate"));
     }
   };
 
@@ -91,64 +94,66 @@ export default function NewSessionPage() {
   return (
     <div className="p-7 max-w-3xl">
       <div className="flex items-center gap-4 mb-7">
-        <button onClick={() => router.back()} className="w-9 h-9 bg-bg3 border border-bg5 rounded-xl flex items-center justify-center text-txt2 hover:text-txt transition-colors">←</button>
-        <h1 className="text-txt font-bold text-2xl">New Session</h1>
+        <button onClick={() => router.back()} aria-label={tCommon("back")} className="w-9 h-9 bg-bg3 border border-bg5 rounded-xl flex items-center justify-center text-txt2 hover:text-txt transition-colors">←</button>
+        <h1 className="text-txt font-bold text-2xl">{t("newSession")}</h1>
       </div>
 
       <form onSubmit={submit} className="flex flex-col gap-5">
         {/* Session details */}
         <div className="bg-bg2 border border-bg5 rounded-2xl p-5">
-          <h2 className="text-txt font-bold text-sm mb-4">Session Details</h2>
+          <h2 className="text-txt font-bold text-sm mb-4">{t("sessionDetails")}</h2>
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2">
-              <label className="text-txt2 text-xs tracking-widest block mb-1.5">TITLE *</label>
+              <label className="text-txt2 text-xs tracking-widest block mb-1.5">{t("titleLabel")}</label>
               <input className="w-full bg-bg3 border border-bg5 rounded-xl px-4 py-2.5 text-txt text-sm outline-none focus:border-primary-light transition-colors placeholder-txt3"
-                placeholder="Swim Endurance" value={form.title} onChange={(e) => setField("title", e.target.value)} required />
+                placeholder={t("titlePlaceholder")} value={form.title} onChange={(e) => setField("title", e.target.value)} required />
             </div>
             <div>
-              <label className="text-txt2 text-xs tracking-widest block mb-1.5">SPORT *</label>
+              <label className="text-txt2 text-xs tracking-widest block mb-1.5">{t("sportLabel")}</label>
               <input className="w-full bg-bg3 border border-bg5 rounded-xl px-4 py-2.5 text-txt text-sm outline-none focus:border-primary-light transition-colors placeholder-txt3"
-                placeholder="Swimming" value={form.sport} onChange={(e) => setField("sport", e.target.value)} required />
+                placeholder={t("sportPlaceholder")} value={form.sport} onChange={(e) => setField("sport", e.target.value)} required />
             </div>
             <div>
-              <label className="text-txt2 text-xs tracking-widest block mb-1.5">LOCATION</label>
+              <label className="text-txt2 text-xs tracking-widest block mb-1.5">{t("locationLabel")}</label>
               <input className="w-full bg-bg3 border border-bg5 rounded-xl px-4 py-2.5 text-txt text-sm outline-none focus:border-primary-light transition-colors placeholder-txt3"
-                placeholder="Olympic Pool, Cairo" value={form.location} onChange={(e) => setField("location", e.target.value)} />
+                placeholder={t("locationPlaceholder")} value={form.location} onChange={(e) => setField("location", e.target.value)} />
             </div>
             <div>
-              <label className="text-txt2 text-xs tracking-widest block mb-1.5">DATE & TIME *</label>
+              <label className="text-txt2 text-xs tracking-widest block mb-1.5">{t("dateTimeLabel")}</label>
               <input type="datetime-local" className="w-full bg-bg3 border border-bg5 rounded-xl px-4 py-2.5 text-txt text-sm outline-none focus:border-primary-light transition-colors"
                 value={form.scheduledAt} onChange={(e) => setField("scheduledAt", e.target.value)} required />
             </div>
             <div>
-              <label className="text-txt2 text-xs tracking-widest block mb-1.5">DURATION (minutes)</label>
+              <label className="text-txt2 text-xs tracking-widest block mb-1.5">{t("durationMinutesLabel")}</label>
               <input type="number" min="15" max="480" className="w-full bg-bg3 border border-bg5 rounded-xl px-4 py-2.5 text-txt text-sm outline-none focus:border-primary-light transition-colors"
                 value={form.durationMinutes} onChange={(e) => setField("durationMinutes", e.target.value)} />
             </div>
             <div className="col-span-2">
-              <label className="text-txt2 text-xs tracking-widest block mb-1.5">DESCRIPTION</label>
+              <label className="text-txt2 text-xs tracking-widest block mb-1.5">{t("descriptionLabel")}</label>
               <textarea rows={2} className="w-full bg-bg3 border border-bg5 rounded-xl px-4 py-2.5 text-txt text-sm outline-none focus:border-primary-light transition-colors resize-none placeholder-txt3"
-                placeholder="Session goals and notes..." value={form.description} onChange={(e) => setField("description", e.target.value)} />
+                placeholder={t("descriptionPlaceholder")} value={form.description} onChange={(e) => setField("description", e.target.value)} />
             </div>
           </div>
         </div>
 
         {/* Exercises */}
         <div className="bg-bg2 border border-bg5 rounded-2xl p-5">
-          <h2 className="text-txt font-bold text-sm mb-4">Exercises</h2>
+          <h2 className="text-txt font-bold text-sm mb-4">{t("exercises")}</h2>
           <div className="flex flex-col gap-3 mb-3">
             {exercises.map((ex, i) => (
               <div key={i} className="bg-bg3 border border-bg5 rounded-xl p-4">
                 <div className="flex items-center gap-2 mb-3">
                   <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center text-white text-xs font-bold">{i + 1}</div>
                   <input className="flex-1 bg-bg4 border border-bg5 rounded-lg px-3 py-1.5 text-txt text-sm outline-none focus:border-primary-light transition-colors placeholder-txt3"
-                    placeholder="Exercise name *" value={ex.name} onChange={(e) => setExField(i, "name", e.target.value)} />
+                    placeholder={t("exerciseNamePlaceholder")} value={ex.name} onChange={(e) => setExField(i, "name", e.target.value)} />
                   <button type="button" onClick={() => removeExercise(i)} className="text-txt3 hover:text-coral transition-colors text-lg">×</button>
                 </div>
                 <div className="grid grid-cols-4 gap-2">
                   {[
-                    { k: "sets", placeholder: "Sets" }, { k: "reps", placeholder: "Reps" },
-                    { k: "durationSeconds", placeholder: "Duration (s)" }, { k: "restSeconds", placeholder: "Rest (s)" },
+                    { k: "sets", placeholder: t("sets") },
+                    { k: "reps", placeholder: t("reps") },
+                    { k: "durationSeconds", placeholder: t("durationSeconds") },
+                    { k: "restSeconds", placeholder: t("restSeconds") },
                   ].map(({ k, placeholder }) => (
                     <input key={k} type="number" min="0" className="bg-bg4 border border-bg5 rounded-lg px-3 py-1.5 text-txt text-xs outline-none focus:border-primary-light transition-colors placeholder-txt3"
                       placeholder={placeholder} value={ex[k as keyof ExerciseDraft]} onChange={(e) => setExField(i, k, e.target.value)} />
@@ -159,14 +164,14 @@ export default function NewSessionPage() {
           </div>
           <button type="button" onClick={addExercise}
             className="w-full py-2.5 border border-dashed border-bg4 rounded-xl text-txt2 text-sm hover:border-primary-light hover:text-txt transition-colors">
-            + Add Exercise
+            {t("addExercise")}
           </button>
         </div>
 
         {/* Assign athletes */}
         {athletes && athletes.length > 0 && (
           <div className="bg-bg2 border border-bg5 rounded-2xl p-5">
-            <h2 className="text-txt font-bold text-sm mb-4">Assign Athletes</h2>
+            <h2 className="text-txt font-bold text-sm mb-4">{t("assignAthletes")}</h2>
             <div className="flex flex-col gap-2">
               {athletes.map((ca) => (
                 <label key={ca.id} className="flex items-center gap-3 cursor-pointer group">
@@ -178,7 +183,7 @@ export default function NewSessionPage() {
                   </div>
                   <div>
                     <p className="text-txt text-sm group-hover:text-primary-light transition-colors">{ca.athlete.user.name}</p>
-                    <p className="text-txt3 text-xs">{ca.athlete.sport ?? "Athlete"}</p>
+                    <p className="text-txt3 text-xs">{ca.athlete.sport ?? t("athleteFallback")}</p>
                   </div>
                 </label>
               ))}
@@ -190,7 +195,7 @@ export default function NewSessionPage() {
 
         <button type="submit" disabled={isLoading}
           className="bg-primary text-white rounded-2xl py-4 font-bold text-sm tracking-wide hover:bg-primary-dark transition-colors disabled:opacity-60">
-          {isLoading ? "Publishing..." : "Publish Session"}
+          {isLoading ? t("publishing") : t("publish")}
         </button>
       </form>
     </div>

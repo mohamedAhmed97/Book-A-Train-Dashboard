@@ -1,5 +1,8 @@
 "use client";
+import { useTranslations } from "next-intl";
 import { trpc } from "@/lib/trpc";
+
+type Translator = ReturnType<typeof useTranslations>;
 
 const TYPE_META: Record<string, { icon: string; color: string }> = {
   SESSION_REMINDER:  { icon: "📅", color: "text-primary bg-bg4" },
@@ -11,17 +14,20 @@ const TYPE_META: Record<string, { icon: string; color: string }> = {
   COACH_MESSAGE:     { icon: "💬", color: "text-primary-dark bg-bg4" },
 };
 
-function timeAgo(date: Date | string) {
+function timeAgo(date: Date | string, t: Translator) {
   const diff = Date.now() - new Date(date).getTime();
   const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
+  if (mins < 1) return t("justNow");
+  if (mins < 60) return t("minutesAgo", { count: mins });
   const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
+  if (hrs < 24) return t("hoursAgo", { count: hrs });
+  return t("daysAgo", { count: Math.floor(hrs / 24) });
 }
 
 export default function NotificationsPage() {
+  const t = useTranslations("notifications");
+  const tTime = useTranslations("notifications.time");
+  const tCommon = useTranslations("common");
   const utils = trpc.useUtils();
   const { data: notifications, isLoading } = trpc.notifications.list.useQuery();
   const markRead = trpc.notifications.markRead.useMutation({
@@ -38,8 +44,8 @@ export default function NotificationsPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-7">
         <div>
-          <h1 className="text-txt font-bold text-2xl">Notifications</h1>
-          {unreadCount > 0 && <p className="text-txt3 text-xs mt-0.5">{unreadCount} unread</p>}
+          <h1 className="text-txt font-bold text-2xl">{t("title")}</h1>
+          {unreadCount > 0 && <p className="text-txt3 text-xs mt-0.5">{t("unread", { count: unreadCount })}</p>}
         </div>
         {unreadCount > 0 && (
           <button
@@ -47,7 +53,7 @@ export default function NotificationsPage() {
             disabled={markAllRead.isPending}
             className="text-primary-light text-sm hover:underline disabled:opacity-50"
           >
-            Mark all as read
+            {t("markAllRead")}
           </button>
         )}
       </div>
@@ -55,14 +61,14 @@ export default function NotificationsPage() {
       {/* List */}
       <div className="bg-bg2 border border-bg5 rounded-2xl overflow-hidden shadow-sm">
         {isLoading && (
-          <div className="flex items-center justify-center py-16 text-txt2 text-sm">Loading...</div>
+          <div className="flex items-center justify-center py-16 text-txt2 text-sm">{tCommon("loading")}</div>
         )}
 
         {!isLoading && (!notifications || notifications.length === 0) && (
           <div className="flex flex-col items-center justify-center py-16 gap-3">
             <span className="text-4xl">🔔</span>
-            <p className="text-txt2 text-sm font-medium">No notifications yet</p>
-            <p className="text-txt3 text-xs">Activity from sessions and athletes will appear here</p>
+            <p className="text-txt2 text-sm font-medium">{t("empty")}</p>
+            <p className="text-txt3 text-xs">{t("emptyHint")}</p>
           </div>
         )}
 
@@ -89,7 +95,7 @@ export default function NotificationsPage() {
                   <p className={`text-sm font-medium leading-snug ${n.read ? "text-txt2" : "text-txt"}`}>
                     {n.title}
                   </p>
-                  <span className="text-txt3 text-[10px] flex-shrink-0 mt-0.5">{timeAgo(n.createdAt)}</span>
+                  <span className="text-txt3 text-[10px] flex-shrink-0 mt-0.5">{timeAgo(n.createdAt, tTime)}</span>
                 </div>
                 <p className="text-txt3 text-xs mt-0.5 leading-relaxed">{n.body}</p>
                 <div className="mt-1.5">
