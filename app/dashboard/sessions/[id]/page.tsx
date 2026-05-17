@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { trpc } from "@/lib/trpc";
 
 interface ExerciseDraft {
@@ -23,6 +24,9 @@ const STATUS_STYLE: Record<string, string> = {
 };
 
 export default function SessionEditPage() {
+  const t = useTranslations("sessionForm");
+  const tCommon = useTranslations("common");
+  const tStatus = useTranslations("sessions.status");
   const router = useRouter();
   const { id } = useParams<{ id: string }>();
   const utils = trpc.useUtils();
@@ -148,7 +152,7 @@ export default function SessionEditPage() {
   if (isLoading) {
     return (
       <div className="p-7 flex items-center justify-center h-64">
-        <div className="text-txt2 text-sm">Loading session...</div>
+        <div className="text-txt2 text-sm">{tCommon("loadingSession")}</div>
       </div>
     );
   }
@@ -156,8 +160,8 @@ export default function SessionEditPage() {
   if (!session) {
     return (
       <div className="p-7">
-        <p className="text-coral text-sm">Session not found.</p>
-        <Link href="/dashboard/sessions" className="text-primary-light text-sm hover:underline mt-2 inline-block">← Back to sessions</Link>
+        <p className="text-coral text-sm">{t("notFound")}</p>
+        <Link href="/dashboard/sessions" className="text-primary-light text-sm hover:underline mt-2 inline-block">{t("backToSessions")}</Link>
       </div>
     );
   }
@@ -168,7 +172,7 @@ export default function SessionEditPage() {
     <div className="p-7 max-w-3xl">
       {/* Header */}
       <div className="flex items-center gap-4 mb-7">
-        <button onClick={() => router.back()}
+        <button onClick={() => router.back()} aria-label={tCommon("back")}
           className="w-9 h-9 bg-bg2 border border-bg5 rounded-xl flex items-center justify-center text-txt2 hover:text-txt hover:border-primary/30 transition-colors shadow-sm">
           ←
         </button>
@@ -177,12 +181,12 @@ export default function SessionEditPage() {
           <p className="text-txt3 text-xs mt-0.5">{session.sport}</p>
         </div>
         <span className={`text-xs rounded-full px-3 py-1 font-medium ${STATUS_STYLE[session.status] ?? ""}`}>
-          {session.status}
+          {tStatus(session.status)}
         </span>
         {!isCancelled && (
           <button onClick={() => cancel.mutate({ id })} disabled={cancel.isPending}
             className="text-coral text-xs border border-coral/30 rounded-xl px-3 py-1.5 hover:bg-coral/10 transition-colors">
-            Cancel Session
+            {t("cancelSession")}
           </button>
         )}
       </div>
@@ -190,49 +194,49 @@ export default function SessionEditPage() {
       <div className="flex flex-col gap-5">
         {/* Session details */}
         <div className="bg-bg2 border border-bg5 rounded-2xl p-5 shadow-sm">
-          <h2 className="text-txt font-bold text-sm mb-4">Session Details</h2>
+          <h2 className="text-txt font-bold text-sm mb-4">{t("sessionDetails")}</h2>
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2">
-              <label className="text-txt2 text-xs tracking-widest block mb-1.5">TITLE</label>
+              <label className="text-txt2 text-xs tracking-widest block mb-1.5">{t("titleLabelOptional")}</label>
               <input disabled={isCancelled}
                 className="w-full bg-bg3 border border-bg5 rounded-xl px-4 py-2.5 text-txt text-sm outline-none focus:border-primary-light transition-colors placeholder-txt3 disabled:opacity-60"
                 value={form.title} onChange={(e) => setField("title", e.target.value)} />
             </div>
             <div>
-              <label className="text-txt2 text-xs tracking-widest block mb-1.5">SPORT</label>
+              <label className="text-txt2 text-xs tracking-widest block mb-1.5">{t("sportLabelOptional")}</label>
               <input disabled={isCancelled}
                 className="w-full bg-bg3 border border-bg5 rounded-xl px-4 py-2.5 text-txt text-sm outline-none focus:border-primary-light transition-colors placeholder-txt3 disabled:opacity-60"
                 value={form.sport} onChange={(e) => setField("sport", e.target.value)} />
             </div>
             <div>
-              <label className="text-txt2 text-xs tracking-widest block mb-1.5">LOCATION</label>
+              <label className="text-txt2 text-xs tracking-widest block mb-1.5">{t("locationLabel")}</label>
               <input disabled={isCancelled}
                 className="w-full bg-bg3 border border-bg5 rounded-xl px-4 py-2.5 text-txt text-sm outline-none focus:border-primary-light transition-colors placeholder-txt3 disabled:opacity-60"
-                placeholder="Optional" value={form.location} onChange={(e) => setField("location", e.target.value)} />
+                placeholder={tCommon("optional")} value={form.location} onChange={(e) => setField("location", e.target.value)} />
             </div>
             <div>
-              <label className="text-txt2 text-xs tracking-widest block mb-1.5">DATE & TIME</label>
+              <label className="text-txt2 text-xs tracking-widest block mb-1.5">{t("dateTimeLabelOptional")}</label>
               <input type="datetime-local" disabled={isCancelled}
                 className="w-full bg-bg3 border border-bg5 rounded-xl px-4 py-2.5 text-txt text-sm outline-none focus:border-primary-light transition-colors disabled:opacity-60"
                 value={form.scheduledAt} onChange={(e) => setField("scheduledAt", e.target.value)} />
             </div>
             <div>
-              <label className="text-txt2 text-xs tracking-widest block mb-1.5">DURATION (min)</label>
+              <label className="text-txt2 text-xs tracking-widest block mb-1.5">{t("durationMinLabel")}</label>
               <input type="number" min="15" max="480" disabled={isCancelled}
                 className="w-full bg-bg3 border border-bg5 rounded-xl px-4 py-2.5 text-txt text-sm outline-none focus:border-primary-light transition-colors disabled:opacity-60"
                 value={form.durationMinutes} onChange={(e) => setField("durationMinutes", e.target.value)} />
             </div>
             <div>
-              <label className="text-txt2 text-xs tracking-widest block mb-1.5">MAX ATHLETES</label>
+              <label className="text-txt2 text-xs tracking-widest block mb-1.5">{t("maxAthletesLabel")}</label>
               <input type="number" min="1" max="100" disabled={isCancelled}
                 className="w-full bg-bg3 border border-bg5 rounded-xl px-4 py-2.5 text-txt text-sm outline-none focus:border-primary-light transition-colors disabled:opacity-60"
                 value={form.maxAthletes} onChange={(e) => setField("maxAthletes", e.target.value)} />
             </div>
             <div className="col-span-2">
-              <label className="text-txt2 text-xs tracking-widest block mb-1.5">DESCRIPTION</label>
+              <label className="text-txt2 text-xs tracking-widest block mb-1.5">{t("descriptionLabel")}</label>
               <textarea rows={2} disabled={isCancelled}
                 className="w-full bg-bg3 border border-bg5 rounded-xl px-4 py-2.5 text-txt text-sm outline-none focus:border-primary-light transition-colors resize-none placeholder-txt3 disabled:opacity-60"
-                placeholder="Session goals and notes..." value={form.description} onChange={(e) => setField("description", e.target.value)} />
+                placeholder={t("descriptionPlaceholder")} value={form.description} onChange={(e) => setField("description", e.target.value)} />
             </div>
           </div>
 
@@ -241,7 +245,7 @@ export default function SessionEditPage() {
           {!isCancelled && (
             <button onClick={handleSaveDetails} disabled={update.isPending}
               className="mt-4 bg-primary text-white rounded-xl px-5 py-2.5 text-sm font-semibold hover:bg-primary-dark transition-colors disabled:opacity-60">
-              {saved ? "✓ Saved!" : update.isPending ? "Saving..." : "Save Details"}
+              {saved ? t("savedBang") : update.isPending ? t("savingDots") : t("saveDetails")}
             </button>
           )}
         </div>
@@ -249,8 +253,8 @@ export default function SessionEditPage() {
         {/* Exercises */}
         <div className="bg-bg2 border border-bg5 rounded-2xl p-5 shadow-sm">
           <h2 className="text-txt font-bold text-sm mb-4">
-            Exercises
-            <span className="ml-2 text-txt3 font-normal text-xs">({exercises.filter((e) => !e.isNew).length} saved)</span>
+            {t("exercises")}
+            <span className="ml-2 text-txt3 font-normal text-xs">{t("exercisesSaved", { count: exercises.filter((e) => !e.isNew).length })}</span>
           </h2>
 
           <div className="flex flex-col gap-3 mb-3">
@@ -263,12 +267,12 @@ export default function SessionEditPage() {
                   </div>
                   <input
                     className="flex-1 bg-bg2 border border-bg5 rounded-lg px-3 py-1.5 text-txt text-sm outline-none focus:border-primary-light transition-colors placeholder-txt3"
-                    placeholder="Exercise name *" value={ex.name}
+                    placeholder={t("exerciseNamePlaceholder")} value={ex.name}
                     onChange={(e) => setExField(i, "name", e.target.value)}
                     disabled={!ex.isNew && !isCancelled ? false : isCancelled}
                   />
                   {ex.isNew ? (
-                    <span className="text-xs text-primary-light bg-bg4 border border-primary/20 rounded-full px-2 py-0.5">New</span>
+                    <span className="text-xs text-primary-light bg-bg4 border border-primary/20 rounded-full px-2 py-0.5">{tCommon("new")}</span>
                   ) : !isCancelled && (
                     <button type="button" onClick={() => handleDeleteExercise(ex.id!)}
                       disabled={deleteExercise.isPending}
@@ -279,8 +283,10 @@ export default function SessionEditPage() {
                 </div>
                 <div className="grid grid-cols-4 gap-2">
                   {[
-                    { k: "sets", placeholder: "Sets" }, { k: "reps", placeholder: "Reps" },
-                    { k: "durationSeconds", placeholder: "Duration (s)" }, { k: "restSeconds", placeholder: "Rest (s)" },
+                    { k: "sets", placeholder: t("sets") },
+                    { k: "reps", placeholder: t("reps") },
+                    { k: "durationSeconds", placeholder: t("durationSeconds") },
+                    { k: "restSeconds", placeholder: t("restSeconds") },
                   ].map(({ k, placeholder }) => (
                     <input key={k} type="number" min="0"
                       className="bg-bg2 border border-bg5 rounded-lg px-3 py-1.5 text-txt text-xs outline-none focus:border-primary-light transition-colors placeholder-txt3"
@@ -299,12 +305,12 @@ export default function SessionEditPage() {
               <button type="button"
                 onClick={() => setExercises((prev) => [...prev, { name: "", sets: "", reps: "", durationSeconds: "", restSeconds: "", notes: "", isNew: true }])}
                 className="flex-1 py-2.5 border border-dashed border-bg5 rounded-xl text-txt2 text-sm hover:border-primary-light hover:text-primary-light transition-colors">
-                + Add Exercise
+                {t("addExercise")}
               </button>
               {exercises.some((e) => e.isNew) && (
                 <button type="button" onClick={handleAddNewExercises} disabled={addExercises.isPending}
                   className="bg-accent text-white rounded-xl px-4 py-2.5 text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-60">
-                  {addExercises.isPending ? "Saving..." : "Save New"}
+                  {addExercises.isPending ? t("savingDots") : t("saveNew")}
                 </button>
               )}
             </div>
@@ -314,8 +320,8 @@ export default function SessionEditPage() {
         {/* Athletes */}
         {athletes && athletes.length > 0 && (
           <div className="bg-bg2 border border-bg5 rounded-2xl p-5 shadow-sm">
-            <h2 className="text-txt font-bold text-sm mb-1">Assigned Athletes</h2>
-            <p className="text-txt3 text-xs mb-4">{session._count.bookings} / {session.maxAthletes} slots filled</p>
+            <h2 className="text-txt font-bold text-sm mb-1">{t("assignedAthletes")}</h2>
+            <p className="text-txt3 text-xs mb-4">{t("slotsFilled", { filled: session._count.bookings, total: session.maxAthletes })}</p>
             <div className="flex flex-col gap-2">
               {athletes.map((ca) => {
                 const isAssigned = assignedIds.has(ca.athlete.id);
@@ -326,13 +332,13 @@ export default function SessionEditPage() {
                     </div>
                     <div className="flex-1">
                       <p className="text-txt text-sm font-medium">{ca.athlete.user.name}</p>
-                      <p className="text-txt3 text-xs">{ca.athlete.sport ?? "Athlete"}</p>
+                      <p className="text-txt3 text-xs">{ca.athlete.sport ?? t("athleteFallback")}</p>
                     </div>
                     {!isCancelled && (
                       <button onClick={() => toggleAthlete(ca.athlete.id)}
                         disabled={assignAthlete.isPending || removeAthlete.isPending}
                         className={`text-xs rounded-full px-3 py-1 font-medium transition-colors ${isAssigned ? "bg-accent text-white hover:opacity-80" : "bg-bg4 text-txt2 hover:bg-primary/10 hover:text-primary"}`}>
-                        {isAssigned ? "Assigned ✓" : "Assign"}
+                        {isAssigned ? t("assigned") : t("assign")}
                       </button>
                     )}
                   </div>

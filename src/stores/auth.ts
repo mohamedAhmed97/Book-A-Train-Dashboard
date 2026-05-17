@@ -13,8 +13,10 @@ interface AuthUser {
 interface AuthStore {
   user: AuthUser | null;
   token: string | null;
+  hasHydrated: boolean;
   setAuth: (user: AuthUser, token: string) => void;
   clearAuth: () => void;
+  setHasHydrated: (v: boolean) => void;
 }
 
 export const useAuthStore = create<AuthStore>()(
@@ -22,9 +24,17 @@ export const useAuthStore = create<AuthStore>()(
     (set) => ({
       user: null,
       token: null,
+      hasHydrated: false,
       setAuth: (user, token) => set({ user, token }),
       clearAuth: () => set({ user: null, token: null }),
+      setHasHydrated: (v) => set({ hasHydrated: v }),
     }),
-    { name: "bat-coach-auth" }
+    {
+      name: "bat-coach-auth",
+      partialize: (state) => ({ user: state.user, token: state.token }),
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true);
+      },
+    }
   )
 );

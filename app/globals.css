@@ -2,8 +2,85 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  background: #F4F7FB;
-  color: #111827;
-  font-family: system-ui, -apple-system, sans-serif;
+@layer base {
+  :root {
+    --background: 210 33% 97%;
+    --foreground: 222 47% 11%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+
+    --primary: 210 73% 36%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 210 36% 96%;
+    --secondary-foreground: 222 47% 11%;
+
+    --muted: 210 36% 96%;
+    --muted-foreground: 215 16% 47%;
+
+    --accent: 162 70% 37%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 76% 56%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 210 73% 36%;
+
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    --background: 222 47% 7%;
+    --foreground: 210 20% 96%;
+
+    --card: 222 35% 11%;
+    --card-foreground: 210 20% 96%;
+
+    --popover: 222 35% 11%;
+    --popover-foreground: 210 20% 96%;
+
+    --primary: 210 80% 54%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 222 35% 16%;
+    --secondary-foreground: 210 20% 96%;
+
+    --muted: 222 35% 16%;
+    --muted-foreground: 215 14% 60%;
+
+    --accent: 162 70% 45%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 70% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 222 35% 18%;
+    --input: 222 35% 18%;
+    --ring: 210 80% 54%;
+  }
+
+  * { @apply border-border; }
+  body {
+    @apply bg-background text-foreground antialiased font-sans;
+    font-feature-settings: "cv11", "ss01", "ss03";
+    background-image:
+      radial-gradient(at 0% 0%, hsl(var(--primary) / 0.05) 0px, transparent 50%),
+      radial-gradient(at 100% 0%, hsl(var(--accent) / 0.05) 0px, transparent 50%);
+    background-attachment: fixed;
+  }
+}
+
+@layer components {
+  .card-hover {
+    @apply transition-all duration-200 hover:shadow-md hover:-translate-y-px;
+  }
+  .focus-ring {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background;
+  }
 }
