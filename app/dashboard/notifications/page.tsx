@@ -8,6 +8,9 @@ const TYPE_META: Record<string, { icon: string; color: string }> = {
   SESSION_REMINDER:  { icon: "📅", color: "text-primary bg-bg4" },
   SESSION_ASSIGNED:  { icon: "✅", color: "text-accent bg-accent/10" },
   SESSION_CANCELLED: { icon: "❌", color: "text-coral bg-coral/10" },
+  SESSION_ACCEPTED:  { icon: "👍", color: "text-accent bg-accent/10" },
+  SESSION_DECLINED:  { icon: "🚫", color: "text-coral bg-coral/10" },
+  EXERCISE_ASSIGNED: { icon: "🏋️", color: "text-primary bg-bg4" },
   FRIEND_REQUEST:    { icon: "🤝", color: "text-amber bg-amber/10" },
   FRIEND_ACCEPTED:   { icon: "👥", color: "text-primary-light bg-bg4" },
   WORKOUT_COMPLETED: { icon: "💪", color: "text-accent bg-accent/10" },
@@ -29,7 +32,7 @@ export default function NotificationsPage() {
   const tTime = useTranslations("notifications.time");
   const tCommon = useTranslations("common");
   const utils = trpc.useUtils();
-  const { data: notifications, isLoading } = trpc.notifications.list.useQuery();
+  const { data: notifications, isLoading } = trpc.notifications.list.useQuery(undefined, { refetchInterval: 30_000 });
   const markRead = trpc.notifications.markRead.useMutation({
     onSuccess: () => { utils.notifications.list.invalidate(); utils.notifications.unreadCount.invalidate(); },
   });
