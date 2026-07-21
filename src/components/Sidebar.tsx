@@ -2,7 +2,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { LayoutDashboard, Users, CalendarDays, Plus, Bell, User, LogOut, Dumbbell } from "lucide-react";
+import { LayoutDashboard, Users, CalendarDays, Plus, Bell, User, LogOut, Dumbbell, BookOpen } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "@/stores/auth";
 import { trpc } from "@/lib/trpc";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +17,7 @@ const NAV = [
   { href: "/dashboard/athletes", icon: Users, key: "athletes" },
   { href: "/dashboard/sessions", icon: CalendarDays, key: "sessions" },
   { href: "/dashboard/sessions/new", icon: Plus, key: "newSession" },
+  { href: "/dashboard/workouts", icon: BookOpen, key: "workouts" },
   { href: "/dashboard/notifications", icon: Bell, key: "notifications" },
   { href: "/dashboard/profile", icon: User, key: "profile" },
 ] as const;
@@ -26,6 +28,12 @@ export function Sidebar() {
   const tNav = useTranslations("nav");
   const tCommon = useTranslations("common");
   const { user, clearAuth } = useAuthStore();
+  const queryClient = useQueryClient();
+
+  function handleSignOut() {
+    clearAuth();
+    queryClient.clear();
+  }
   const initials = user?.name.split(" ").map((n) => n[0]).join("").slice(0, 2) ?? "C";
   const { data: unread } = trpc.notifications.unreadCount.useQuery(undefined, { refetchInterval: 30_000 });
 
@@ -92,7 +100,7 @@ export function Sidebar() {
             <p className="text-muted-foreground text-[10px] truncate">{user?.email}</p>
           </div>
         </div>
-        <Button variant="ghost" size="sm" className="w-full justify-start text-destructive hover:text-destructive hover:bg-destructive/10" onClick={clearAuth}>
+        <Button variant="ghost" size="sm" className="w-full justify-start text-destructive hover:text-destructive hover:bg-destructive/10" onClick={handleSignOut}>
           <LogOut className="h-4 w-4" />
           {tCommon("signOut")}
         </Button>

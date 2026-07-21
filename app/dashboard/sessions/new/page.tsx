@@ -1,7 +1,8 @@
 "use client";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
+import { BookOpen, X } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 
 interface ExerciseDraft {
@@ -14,6 +15,59 @@ interface ExerciseDraft {
 }
 
 const EMPTY_EXERCISE: ExerciseDraft = { name: "", sets: "", reps: "", durationSeconds: "", restSeconds: "", notes: "" };
+
+function LibraryPicker({ onSelect, onClose }: {
+  onSelect: (ex: ExerciseDraft) => void;
+  onClose: () => void;
+}) {
+  const { data: templates = [] } = trpc.workoutTemplates.list.useQuery();
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [onClose]);
+
+  return (
+    <div ref={ref} className="absolute z-20 top-full mt-1 start-0 w-64 bg-bg2 border border-bg5 rounded-xl shadow-lg overflow-hidden">
+      {templates.length === 0 ? (
+        <p className="text-txt3 text-xs px-4 py-3">No saved workouts yet. Add them in the Workouts page.</p>
+      ) : (
+        <div className="max-h-56 overflow-y-auto">
+          {templates.map((tmpl) => {
+            const detail = [
+              tmpl.sets ? `${tmpl.sets} sets` : null,
+              tmpl.reps ? `${tmpl.reps} reps` : null,
+              tmpl.durationSeconds ? `${tmpl.durationSeconds}s` : null,
+              tmpl.restSeconds ? `${tmpl.restSeconds}s rest` : null,
+            ].filter(Boolean).join(" · ");
+            return (
+              <button key={tmpl.id}
+                className="w-full text-start px-4 py-2.5 hover:bg-bg3 transition-colors border-b border-bg5 last:border-b-0"
+                onClick={() => {
+                  onSelect({
+                    name: tmpl.name,
+                    sets: tmpl.sets != null ? String(tmpl.sets) : "",
+                    reps: tmpl.reps != null ? String(tmpl.reps) : "",
+                    durationSeconds: tmpl.durationSeconds != null ? String(tmpl.durationSeconds) : "",
+                    restSeconds: tmpl.restSeconds != null ? String(tmpl.restSeconds) : "",
+                    notes: tmpl.notes ?? "",
+                  });
+                  onClose();
+                }}>
+                <p className="text-txt text-sm font-medium">{tmpl.name}</p>
+                {detail && <p className="text-txt3 text-[10px] mt-0.5">{detail}</p>}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function NewSessionPage() {
   const t = useTranslations("sessionForm");
@@ -29,6 +83,7 @@ export default function NewSessionPage() {
   const [exercises, setExercises] = useState<ExerciseDraft[]>([{ ...EMPTY_EXERCISE }]);
   const [selectedAthletes, setSelectedAthletes] = useState<string[]>([]);
   const [error, setError] = useState("");
+  const [pickerOpenAt, setPickerOpenAt] = useState<number | null>(null);
 
   const createSession = trpc.sessions.create.useMutation();
   const addExercises = trpc.exercises.addMany.useMutation();
@@ -40,6 +95,10 @@ export default function NewSessionPage() {
 
   const addExercise = () => setExercises((prev) => [...prev, { ...EMPTY_EXERCISE }]);
   const removeExercise = (i: number) => setExercises((prev) => prev.filter((_, j) => j !== i));
+
+  const fillFromLibrary = (i: number, draft: ExerciseDraft) => {
+    setExercises((prev) => prev.map((ex, j) => j === i ? { ...draft } : ex));
+  };
 
   const toggleAthlete = (id: string) =>
     setSelectedAthletes((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
@@ -143,10 +202,27 @@ export default function NewSessionPage() {
             {exercises.map((ex, i) => (
               <div key={i} className="bg-bg3 border border-bg5 rounded-xl p-4">
                 <div className="flex items-center gap-2 mb-3">
-                  <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center text-white text-xs font-bold">{i + 1}</div>
+                  <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center text-white text-xs font-bold flex-shrink-0">{i + 1}</div>
                   <input className="flex-1 bg-bg4 border border-bg5 rounded-lg px-3 py-1.5 text-txt text-sm outline-none focus:border-primary-light transition-colors placeholder-txt3"
                     placeholder={t("exerciseNamePlaceholder")} value={ex.name} onChange={(e) => setExField(i, "name", e.target.value)} />
-                  <button type="button" onClick={() => removeExercise(i)} className="text-txt3 hover:text-coral transition-colors text-lg">×</button>
+                  {/* Library picker trigger */}
+                  <div className="relative">
+                    <button type="button"
+                      onClick={() => setPickerOpenAt(pickerOpenAt === i ? null : i)}
+                      className="w-8 h-8 flex items-center justify-center rounded-lg text-txt3 hover:text-primary hover:bg-primary/10 transition-colors"
+                      title="Pick from library">
+                      <BookOpen size={15} />
+                    </button>
+                    {pickerOpenAt === i && (
+                      <LibraryPicker
+                        onSelect={(draft) => fillFromLibrary(i, draft)}
+                        onClose={() => setPickerOpenAt(null)}
+                      />
+                    )}
+                  </div>
+                  <button type="button" onClick={() => removeExercise(i)} className="text-txt3 hover:text-coral transition-colors text-lg">
+                    <X size={16} />
+                  </button>
                 </div>
                 <div className="grid grid-cols-4 gap-2">
                   {[

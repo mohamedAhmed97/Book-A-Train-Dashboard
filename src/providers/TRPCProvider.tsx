@@ -5,16 +5,14 @@ import { httpBatchLink } from "@trpc/client";
 import { trpc } from "@/lib/trpc";
 import { useAuthStore } from "@/stores/auth";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/trpc";
-
-export function TRPCProvider({ children }: { children: React.ReactNode }) {
+export function TRPCProvider({ children, apiUrl }: { children: React.ReactNode; apiUrl: string }) {
   const token = useAuthStore((s) => s.token);
   const tokenRef = useRef(token);
   tokenRef.current = token;
   const [queryClient] = useState(() => new QueryClient({ defaultOptions: { queries: { retry: 1, staleTime: 30_000 } } }));
   const [trpcClient] = useState(() =>
     trpc.createClient({
-      links: [httpBatchLink({ url: API_URL, headers: () => (tokenRef.current ? { Authorization: `Bearer ${tokenRef.current}` } : {}) })],
+      links: [httpBatchLink({ url: apiUrl, headers: () => (tokenRef.current ? { Authorization: `Bearer ${tokenRef.current}` } : {}) })],
     })
   );
   return (

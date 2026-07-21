@@ -1,8 +1,9 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
+import { BookOpen } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 
 interface ExerciseDraft {
@@ -14,6 +15,59 @@ interface ExerciseDraft {
   restSeconds: string;
   notes: string;
   isNew?: boolean;
+}
+
+function LibraryPicker({ onSelect, onClose }: {
+  onSelect: (name: string, sets: string, reps: string, durationSeconds: string, restSeconds: string, notes: string) => void;
+  onClose: () => void;
+}) {
+  const { data: templates = [] } = trpc.workoutTemplates.list.useQuery();
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [onClose]);
+
+  return (
+    <div ref={ref} className="absolute z-20 top-full mt-1 start-0 w-64 bg-bg2 border border-bg5 rounded-xl shadow-lg overflow-hidden">
+      {templates.length === 0 ? (
+        <p className="text-txt3 text-xs px-4 py-3">No saved workouts yet. Add them in the Workouts page.</p>
+      ) : (
+        <div className="max-h-56 overflow-y-auto">
+          {templates.map((tmpl) => {
+            const detail = [
+              tmpl.sets ? `${tmpl.sets} sets` : null,
+              tmpl.reps ? `${tmpl.reps} reps` : null,
+              tmpl.durationSeconds ? `${tmpl.durationSeconds}s` : null,
+              tmpl.restSeconds ? `${tmpl.restSeconds}s rest` : null,
+            ].filter(Boolean).join(" · ");
+            return (
+              <button key={tmpl.id}
+                className="w-full text-start px-4 py-2.5 hover:bg-bg3 transition-colors border-b border-bg5 last:border-b-0"
+                onClick={() => {
+                  onSelect(
+                    tmpl.name,
+                    tmpl.sets != null ? String(tmpl.sets) : "",
+                    tmpl.reps != null ? String(tmpl.reps) : "",
+                    tmpl.durationSeconds != null ? String(tmpl.durationSeconds) : "",
+                    tmpl.restSeconds != null ? String(tmpl.restSeconds) : "",
+                    tmpl.notes ?? "",
+                  );
+                  onClose();
+                }}>
+                <p className="text-txt text-sm font-medium">{tmpl.name}</p>
+                {detail && <p className="text-txt3 text-[10px] mt-0.5">{detail}</p>}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
 }
 
 const STATUS_STYLE: Record<string, string> = {
@@ -42,6 +96,7 @@ export default function SessionEditPage() {
   const [assignedIds, setAssignedIds] = useState<Set<string>>(new Set());
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
+  const [pickerOpenAt, setPickerOpenAt] = useState<number | null>(null);
 
   useEffect(() => {
     if (!session) return;
@@ -271,6 +326,30 @@ export default function SessionEditPage() {
                     onChange={(e) => setExField(i, "name", e.target.value)}
                     disabled={!ex.isNew && !isCancelled ? false : isCancelled}
                   />
+                  {!isCancelled && (
+                    <div className="relative">
+                      <button type="button"
+                        onClick={() => setPickerOpenAt(pickerOpenAt === i ? null : i)}
+                        className="w-8 h-8 flex items-center justify-center rounded-lg text-txt3 hover:text-primary hover:bg-primary/10 transition-colors"
+                        title="Pick from library">
+                        <BookOpen size={15} />
+                      </button>
+                      {pickerOpenAt === i && (
+                        <LibraryPicker
+                          onSelect={(name, sets, reps, durationSeconds, restSeconds, notes) => {
+                            setExField(i, "name", name);
+                            setExField(i, "sets", sets);
+                            setExField(i, "reps", reps);
+                            setExField(i, "durationSeconds", durationSeconds);
+                            setExField(i, "restSeconds", restSeconds);
+                            setExField(i, "notes", notes);
+                            setPickerOpenAt(null);
+                          }}
+                          onClose={() => setPickerOpenAt(null)}
+                        />
+                      )}
+                    </div>
+                  )}
                   {ex.isNew ? (
                     <span className="text-xs text-primary-light bg-bg4 border border-primary/20 rounded-full px-2 py-0.5">{tCommon("new")}</span>
                   ) : !isCancelled && (

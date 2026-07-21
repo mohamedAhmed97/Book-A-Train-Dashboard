@@ -9,6 +9,10 @@ import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans", display: "swap" });
 
+// Force per-request rendering so process.env["API_URL"] is read from the
+// container environment at runtime, not baked in during `pnpm build`.
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Book a Train — Coach | احجز تدريب — المدرب",
   description: "Manage your athletes and training sessions · إدارة الرياضيين وجلسات التدريب",
@@ -35,7 +39,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body className="bg-background text-foreground antialiased font-sans">
         <NextIntlClientProvider locale={locale} messages={messages}>
           <ThemeApplier />
-          <TRPCProvider>{children}</TRPCProvider>
+          <TRPCProvider apiUrl={process.env["API_URL"] ?? "http://localhost:3001/trpc"}>{children}</TRPCProvider>
         </NextIntlClientProvider>
       </body>
     </html>

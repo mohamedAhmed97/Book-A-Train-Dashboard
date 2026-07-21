@@ -30,6 +30,7 @@
     "athletes": "الرياضيون",
     "sessions": "الجلسات",
     "newSession": "جلسة جديدة",
+    "workouts": "التمارين",
     "notifications": "الإشعارات",
     "profile": "الملف الشخصي"
   },
@@ -90,7 +91,34 @@
     "thSport": "الرياضة",
     "thSessions": "الجلسات",
     "thActions": "الإجراءات",
-    "empty": "لا يوجد رياضيون بعد. أضف واحدًا أعلاه."
+    "empty": "لا يوجد رياضيون بعد. أضف واحدًا أعلاه.",
+    "viewProfile": "عرض الملف الشخصي"
+  },
+  "athleteProfile": {
+    "notFound": "الرياضي غير موجود.",
+    "goals": "الأهداف",
+    "totalSessions": "إجمالي الجلسات",
+    "sessionsAttended": "المحضورة",
+    "exercisesDone": "تمارين منجزة",
+    "workoutsRecorded": "تمارين مسجّلة",
+    "sessions": "الجلسات",
+    "noSessions": "لا توجد جلسات مع هذا الرياضي بعد.",
+    "workoutSaved": "تم حفظ التمرين",
+    "sessionInfo": "تفاصيل الجلسة",
+    "workoutResult": "نتيجة التمرين",
+    "workoutMetrics": "مقاييس التمرين",
+    "noWorkoutRecorded": "لم يُسجَّل أي تمرين لهذه الجلسة.",
+    "duration": "المدة",
+    "distance": "المسافة",
+    "pace": "الإيقاع",
+    "speed": "السرعة",
+    "laps": "الأشواط",
+    "calories": "السعرات",
+    "notes": "ملاحظات",
+    "exerciseProgress": "تقدم التمارين",
+    "exercises": "تمارين",
+    "done": "تم",
+    "noData": "لا توجد بيانات مسجّلة لهذه الجلسة."
   },
   "sessions": {
     "title": "الجلسات",
@@ -154,6 +182,18 @@
     "saveNew": "حفظ الجديد",
     "notFound": "الجلسة غير موجودة.",
     "backToSessions": "← العودة إلى الجلسات"
+  },
+  "workouts": {
+    "title": "مكتبة التمارين",
+    "subtitle": "احفظ التمارين لإعادة استخدامها في الجلسات",
+    "addWorkout": "تمرين جديد",
+    "newWorkout": "تمرين جديد",
+    "empty": "لا توجد تمارين محفوظة بعد.",
+    "addFirst": "أضف أول تمرين",
+    "allSports": "جميع الرياضات",
+    "seedTitle": "تحميل تمارين {sport} الافتراضية",
+    "seedDesc": "أضف مجموعة من التمارين الجاهزة لهذه الرياضة إلى مكتبتك.",
+    "loadDefaults": "تحميل الافتراضيات"
   },
   "notifications": {
     "title": "الإشعارات",

@@ -30,6 +30,7 @@
     "athletes": "Athletes",
     "sessions": "Sessions",
     "newSession": "New Session",
+    "workouts": "Workouts",
     "notifications": "Notifications",
     "profile": "Profile"
   },
@@ -90,7 +91,34 @@
     "thSport": "SPORT",
     "thSessions": "SESSIONS",
     "thActions": "ACTIONS",
-    "empty": "No athletes yet. Add one above."
+    "empty": "No athletes yet. Add one above.",
+    "viewProfile": "View Profile"
+  },
+  "athleteProfile": {
+    "notFound": "Athlete not found.",
+    "goals": "Goals",
+    "totalSessions": "Total Sessions",
+    "sessionsAttended": "Attended",
+    "exercisesDone": "Exercises Done",
+    "workoutsRecorded": "Workouts Recorded",
+    "sessions": "Sessions",
+    "noSessions": "No sessions with this athlete yet.",
+    "workoutSaved": "Workout Saved",
+    "sessionInfo": "Session Info",
+    "workoutResult": "Workout Result",
+    "workoutMetrics": "Workout Metrics",
+    "noWorkoutRecorded": "No workout recorded for this session.",
+    "duration": "Duration",
+    "distance": "Distance",
+    "pace": "Pace",
+    "speed": "Speed",
+    "laps": "Laps",
+    "calories": "Calories",
+    "notes": "Notes",
+    "exerciseProgress": "Exercise Progress",
+    "exercises": "exercises",
+    "done": "Done",
+    "noData": "No data recorded for this session."
   },
   "sessions": {
     "title": "Sessions",
@@ -154,6 +182,18 @@
     "saveNew": "Save New",
     "notFound": "Session not found.",
     "backToSessions": "← Back to sessions"
+  },
+  "workouts": {
+    "title": "Workout Library",
+    "subtitle": "Save exercises to reuse across sessions",
+    "addWorkout": "New Workout",
+    "newWorkout": "New Workout",
+    "empty": "No workouts saved yet.",
+    "addFirst": "Add your first workout",
+    "allSports": "All Sports",
+    "seedTitle": "Load {sport} defaults",
+    "seedDesc": "Add a set of pre-built exercises for this sport to your library.",
+    "loadDefaults": "Load Defaults"
   },
   "notifications": {
     "title": "Notifications",

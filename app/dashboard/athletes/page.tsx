@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useTranslations } from "next-intl";
+import { useRouter } from "next/navigation";
 import { Users } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { PageHero } from "@/components/PageHero";
@@ -8,6 +9,7 @@ import { PageHero } from "@/components/PageHero";
 export default function AthletesPage() {
   const t = useTranslations("athletes");
   const tCommon = useTranslations("common");
+  const router = useRouter();
   const utils = trpc.useUtils();
   const { data: athletes, isLoading } = trpc.athletes.list.useQuery();
   const { data: stats } = trpc.profile.coachStats.useQuery();
@@ -73,11 +75,11 @@ export default function AthletesPage() {
 
       {/* Athletes table */}
       <div className="bg-bg2 border border-bg5 rounded-2xl overflow-hidden">
-        <div className="grid grid-cols-5 px-5 py-3 border-b border-bg5 text-txt3 text-[10px] tracking-widest">
+        <div className="grid grid-cols-6 px-5 py-3 border-b border-bg5 text-txt3 text-[10px] tracking-widest">
           <span className="col-span-2">{t("thAthlete")}</span>
           <span>{t("thSport")}</span>
           <span>{t("thSessions")}</span>
-          <span>{t("thActions")}</span>
+          <span className="col-span-2">{t("thActions")}</span>
         </div>
 
         {isLoading && <p className="text-txt2 text-sm text-center py-10">{tCommon("loading")}</p>}
@@ -86,7 +88,7 @@ export default function AthletesPage() {
         )}
 
         {athletes?.map((ca) => (
-          <div key={ca.id} className="grid grid-cols-5 px-5 py-4 border-b border-bg5 items-center hover:bg-bg3 transition-colors last:border-b-0">
+          <div key={ca.id} className="grid grid-cols-6 px-5 py-4 border-b border-bg5 items-center hover:bg-bg3 transition-colors last:border-b-0">
             <div className="col-span-2 flex items-center gap-3">
               <div className="w-9 h-9 rounded-full bg-primary flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
                 {ca.athlete.user.name.charAt(0)}
@@ -98,12 +100,20 @@ export default function AthletesPage() {
             </div>
             <span className="text-txt2 text-sm">{ca.athlete.sport ?? "—"}</span>
             <span className="text-txt2 text-sm">{ca.athlete.bookings.length}</span>
-            <button
-              onClick={() => remove.mutate({ athleteProfileId: ca.athlete.id })}
-              className="text-coral text-xs hover:underline w-fit"
-            >
-              {tCommon("remove")}
-            </button>
+            <div className="col-span-2 flex items-center gap-4">
+              <button
+                onClick={() => router.push(`/dashboard/athletes/${ca.athlete.id}`)}
+                className="text-primary text-xs font-semibold hover:underline"
+              >
+                {t("viewProfile")}
+              </button>
+              <button
+                onClick={() => remove.mutate({ athleteProfileId: ca.athlete.id })}
+                className="text-coral text-xs hover:underline"
+              >
+                {tCommon("remove")}
+              </button>
+            </div>
           </div>
         ))}
       </div>
