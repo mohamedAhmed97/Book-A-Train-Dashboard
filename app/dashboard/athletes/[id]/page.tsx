@@ -5,7 +5,11 @@ import { useTranslations } from "next-intl";
 import {
   ArrowLeft, Activity, Clock, Flame, Gauge, Waves, CheckCircle2, Circle,
   ChevronDown, ChevronUp, Timer, MapPin, FileText, CalendarDays, Dumbbell,
+  ClipboardList, X,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { trpc } from "@/lib/trpc";
 
 const STATUS_STYLE: Record<string, string> = {
@@ -42,6 +46,51 @@ export default function AthleteProfilePage() {
 
   const { data: athlete, isLoading } = trpc.athletes.getProfile.useQuery({ athleteProfileId: id });
   const [expandedBookingId, setExpandedBookingId] = useState<string | null>(null);
+
+  // Tests
+  const tTests = useTranslations("tests");
+  const utils = trpc.useUtils();
+  const { data: catalog = [] } = trpc.tests.catalog.useQuery();
+  const { data: athleteTests = [], isLoading: testsLoading } = trpc.tests.athleteTests.useQuery({ athleteProfileId: id });
+  const [showAssignForm, setShowAssignForm] = useState(false);
+  const [assignForm, setAssignForm] = useState({ testId: "", scheduledAt: "", notes: "" });
+  const [assignError, setAssignError] = useState("");
+  const [openResultId, setOpenResultId] = useState<string | null>(null);
+  const [resultForms, setResultForms] = useState<Record<string, { value: string; notes: string }>>({});
+
+  const assignMut = trpc.tests.assign.useMutation({
+    onSuccess: () => {
+      setAssignForm({ testId: "", scheduledAt: "", notes: "" });
+      setAssignError("");
+      setShowAssignForm(false);
+      utils.tests.athleteTests.invalidate();
+    },
+    onError: (e) => setAssignError(e.message),
+  });
+
+  const addResultMut = trpc.tests.addResult.useMutation({
+    onSuccess: () => {
+      setOpenResultId(null);
+      setResultForms({});
+      utils.tests.athleteTests.invalidate();
+    },
+  });
+
+  function handleAssign() {
+    if (!assignForm.testId) { setAssignError(tTests("errorRequired")); return; }
+    assignMut.mutate({
+      athleteProfileId: id,
+      testId: assignForm.testId,
+      scheduledAt: assignForm.scheduledAt ? new Date(assignForm.scheduledAt) : undefined,
+      notes: assignForm.notes || undefined,
+    });
+  }
+
+  function handleRecordResult(athleteTestId: string) {
+    const form = resultForms[athleteTestId];
+    if (!form?.value) return;
+    addResultMut.mutate({ athleteTestId, value: parseFloat(form.value), notes: form.notes || undefined });
+  }
 
   if (isLoading) {
     return (
@@ -103,11 +152,16 @@ export default function AthleteProfilePage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-5 gap-4 mb-6">
         <StatCard label={t("totalSessions")} value={String(athlete.bookings.length)} />
         <StatCard label={t("sessionsAttended")} value={String(pastBookings.length)} accent="text-accent" />
         <StatCard label={t("exercisesDone")} value={String(totalExercisesDone)} accent="text-primary" />
         <StatCard label={t("workoutsRecorded")} value={String(workoutsRecorded)} accent="text-amber" />
+        <StatCard
+          label="Tests"
+          value={`${athleteTests.filter((t: any) => t.status === "COMPLETED").length}/${athleteTests.length}`}
+          accent="text-purple-500"
+        />
       </div>
 
       {/* Sessions list */}
@@ -350,6 +404,204 @@ export default function AthleteProfilePage() {
             </div>
           );
         })}
+      </div>
+      {/* ── Tests Section ─────────────────────────────────────────── */}
+      <div className="bg-bg2 border border-bg5 rounded-2xl overflow-hidden mt-6">
+        {/* Header */}
+        <div className="px-5 py-4 border-b border-bg5 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <ClipboardList size={15} className="text-primary" />
+            <h2 className="text-txt font-bold text-sm">{tTests("title")}</h2>
+            {athleteTests.length > 0 && (
+              <span className="text-[10px] font-bold text-txt3 bg-bg3 border border-bg5 px-2 py-0.5 rounded-full">
+                {athleteTests.filter((t: any) => t.status === "COMPLETED").length}/{athleteTests.length}
+              </span>
+            )}
+          </div>
+          <button
+            onClick={() => setShowAssignForm(!showAssignForm)}
+            className="flex items-center gap-1.5 text-primary text-xs font-semibold hover:opacity-80 transition-opacity"
+          >
+            {showAssignForm ? <X size={13} /> : <ClipboardList size={13} />}
+            {showAssignForm ? tCommon("cancel") : tTests("assignTest")}
+          </button>
+        </div>
+
+        {/* Assign form */}
+        {showAssignForm && (
+          <div className="px-5 py-4 border-b border-bg5 bg-bg3/40">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+              <div>
+                <Label className="text-txt3 text-[10px] tracking-widest font-bold mb-1.5 block">
+                  {tTests("selectTest").toUpperCase()} *
+                </Label>
+                <select
+                  value={assignForm.testId}
+                  onChange={(e) => setAssignForm((p) => ({ ...p, testId: e.target.value }))}
+                  className="w-full rounded-lg border border-bg5 bg-bg2 text-txt text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/40"
+                >
+                  <option value="">{tTests("selectTest")}</option>
+                  {catalog.map((test: any) => (
+                    <option key={test.id} value={test.id}>
+                      {test.name} ({test.unit})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <Label className="text-txt3 text-[10px] tracking-widest font-bold mb-1.5 block">
+                  {tTests("scheduledDate").toUpperCase()}
+                </Label>
+                <Input
+                  type="date"
+                  value={assignForm.scheduledAt}
+                  onChange={(e) => setAssignForm((p) => ({ ...p, scheduledAt: e.target.value }))}
+                  className="bg-bg2 border-bg5 text-txt text-sm"
+                />
+              </div>
+              <div>
+                <Label className="text-txt3 text-[10px] tracking-widest font-bold mb-1.5 block">
+                  {tTests("notes").toUpperCase()}
+                </Label>
+                <Input
+                  value={assignForm.notes}
+                  onChange={(e) => setAssignForm((p) => ({ ...p, notes: e.target.value }))}
+                  placeholder={tTests("notesPlaceholder")}
+                  className="bg-bg2 border-bg5 text-txt text-sm"
+                />
+              </div>
+            </div>
+            {assignError && <p className="text-coral text-xs mb-2">{assignError}</p>}
+            <Button
+              size="sm"
+              onClick={handleAssign}
+              disabled={assignMut.isPending}
+              className="bg-primary hover:bg-primary/90 text-white"
+            >
+              {assignMut.isPending ? tTests("assigning") : tTests("assign")}
+            </Button>
+          </div>
+        )}
+
+        {/* Tests list */}
+        {testsLoading ? (
+          <p className="text-txt3 text-sm text-center py-8">{tCommon("loading")}</p>
+        ) : athleteTests.length === 0 ? (
+          <p className="text-txt3 text-sm text-center py-8">{tTests("noAssignments")}</p>
+        ) : (
+          <div className="divide-y divide-bg5">
+            {athleteTests.map((item: any) => {
+              const isDone = item.status === "COMPLETED";
+              const isOpen = openResultId === item.id;
+              const form = resultForms[item.id] ?? { value: "", notes: "" };
+
+              return (
+                <div key={item.id} className="px-5 py-4">
+                  <div className="flex items-start gap-3">
+                    <div className="mt-0.5 flex-shrink-0">
+                      {isDone
+                        ? <CheckCircle2 size={16} className="text-accent" />
+                        : <Clock size={16} className="text-amber" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                        <span className="text-txt font-semibold text-sm">{item.test.name}</span>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                          isDone
+                            ? "text-accent bg-accent/10 border border-accent/20"
+                            : "text-amber bg-amber/10 border border-amber/20"
+                        }`}>
+                          {isDone ? tTests("completed").toUpperCase() : tTests("pending").toUpperCase()}
+                        </span>
+                        <span className="text-txt3 text-xs">{item.test.unit}</span>
+                      </div>
+
+                      {item.scheduledAt && (
+                        <p className="text-txt3 text-xs mb-1">
+                          {tTests("scheduledFor", { date: new Date(item.scheduledAt).toLocaleDateString() })}
+                        </p>
+                      )}
+                      {item.notes && (
+                        <p className="text-txt2 text-xs italic mb-1">{item.notes}</p>
+                      )}
+
+                      {/* Completed result */}
+                      {isDone && item.result && (
+                        <div className="inline-flex items-center gap-1.5 bg-accent/8 border border-accent/20 rounded-xl px-3 py-1.5 mt-1">
+                          <span className="text-accent font-bold text-base">{item.result.value}</span>
+                          <span className="text-txt3 text-xs">{item.result.unit}</span>
+                          {item.result.notes && (
+                            <span className="text-txt3 text-xs ml-1">— {item.result.notes}</span>
+                          )}
+                          <span className="text-txt3 text-[10px] ml-2">
+                            {tTests("completedOn", { date: new Date(item.result.completedAt).toLocaleDateString() })}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Add result form */}
+                      {!isDone && (
+                        <div className="mt-2">
+                          <button
+                            onClick={() => setOpenResultId(isOpen ? null : item.id)}
+                            className="flex items-center gap-1.5 text-primary text-xs font-semibold hover:opacity-80 transition-opacity"
+                          >
+                            {isOpen ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                            {tTests("addResult")}
+                          </button>
+
+                          {isOpen && (
+                            <div className="mt-2 p-3 bg-bg3 rounded-xl border border-bg5 flex flex-col gap-2">
+                              <div className="flex gap-2">
+                                <div className="flex-1">
+                                  <Label className="text-txt3 text-[10px] tracking-widest font-bold mb-1 block">
+                                    {tTests("value").toUpperCase()} ({item.test.unit}) *
+                                  </Label>
+                                  <Input
+                                    type="number"
+                                    step="0.01"
+                                    value={form.value}
+                                    onChange={(e) => setResultForms((p) => ({ ...p, [item.id]: { ...form, value: e.target.value } }))}
+                                    placeholder="0"
+                                    className="bg-bg2 border-bg5 text-txt text-sm"
+                                  />
+                                </div>
+                                <div className="flex-1">
+                                  <Label className="text-txt3 text-[10px] tracking-widest font-bold mb-1 block">
+                                    {tTests("notes").toUpperCase()}
+                                  </Label>
+                                  <Input
+                                    value={form.notes}
+                                    onChange={(e) => setResultForms((p) => ({ ...p, [item.id]: { ...form, notes: e.target.value } }))}
+                                    placeholder="Optional..."
+                                    className="bg-bg2 border-bg5 text-txt text-sm"
+                                  />
+                                </div>
+                              </div>
+                              <div className="flex gap-2">
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleRecordResult(item.id)}
+                                  disabled={!form.value || addResultMut.isPending}
+                                  className="bg-accent hover:bg-accent/90 text-white text-xs"
+                                >
+                                  {addResultMut.isPending ? tTests("recording") : tTests("recordResult")}
+                                </Button>
+                                <Button size="sm" variant="ghost" onClick={() => setOpenResultId(null)} className="text-txt3">
+                                  <X size={13} />
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );

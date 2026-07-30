@@ -19,11 +19,12 @@ export const profileRouter = router({
       phone: z.string().optional(),
       avatar: z.string().url().optional(),
       sport: z.string().optional(),
+      sports: z.array(z.string()).optional(),
       bio: z.string().max(300).optional(),
       goals: z.string().max(300).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      const { name, phone, avatar, sport, bio, goals } = input;
+      const { name, phone, avatar, sport, sports, bio, goals } = input;
       const user = await db.user.update({
         where: { id: ctx.userId },
         data: { ...(name && { name }), ...(phone && { phone }), ...(avatar && { avatar }) },
@@ -34,10 +35,13 @@ export const profileRouter = router({
           data: { ...(sport && { sport }), ...(bio && { bio }), ...(goals && { goals }) },
         });
       }
-      if (user.role === "COACH" && (sport || bio)) {
+      if (user.role === "COACH" && (sports !== undefined || bio !== undefined)) {
         await db.coachProfile.update({
           where: { userId: ctx.userId },
-          data: { ...(sport && { sport }), ...(bio && { bio }) },
+          data: {
+            ...(sports !== undefined && { sports }),
+            ...(bio !== undefined && { bio }),
+          },
         });
       }
       const updated = await db.user.findUnique({

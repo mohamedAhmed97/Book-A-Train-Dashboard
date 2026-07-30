@@ -3,8 +3,12 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { BookOpen } from "lucide-react";
+import { BookOpen, X } from "lucide-react";
 import { trpc } from "@/lib/trpc";
+import {
+  SPORTS, SPORT_MAP, WOD_OPTIONS, getExerciseFields, findSport,
+  type FieldConfig,
+} from "@/lib/sports";
 
 interface ExerciseDraft {
   id?: string;
@@ -14,8 +18,13 @@ interface ExerciseDraft {
   durationSeconds: string;
   restSeconds: string;
   notes: string;
+  wodType: string;
   isNew?: boolean;
 }
+
+const EMPTY_EXERCISE: ExerciseDraft = {
+  name: "", sets: "", reps: "", durationSeconds: "", restSeconds: "", notes: "", wodType: "",
+};
 
 function LibraryPicker({ onSelect, onClose }: {
   onSelect: (name: string, sets: string, reps: string, durationSeconds: string, restSeconds: string, notes: string) => void;
@@ -87,6 +96,9 @@ export default function SessionEditPage() {
 
   const { data: session, isLoading } = trpc.sessions.get.useQuery({ id });
   const { data: athletes } = trpc.athletes.list.useQuery();
+  const { data: profile } = trpc.profile.get.useQuery();
+
+  const coachSports: string[] = (profile?.coachProfile as any)?.sports ?? [];
 
   const [form, setForm] = useState({
     title: "", sport: "", description: "", location: "",
@@ -102,9 +114,11 @@ export default function SessionEditPage() {
     if (!session) return;
     const dt = new Date(session.scheduledAt);
     const local = new Date(dt.getTime() - dt.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+    // Resolve sport to a canonical ID for the dropdown
+    const sportDef = findSport(session.sport);
     setForm({
       title: session.title,
-      sport: session.sport,
+      sport: sportDef?.id ?? session.sport,
       description: session.description ?? "",
       location: session.location ?? "",
       scheduledAt: local,
@@ -112,7 +126,7 @@ export default function SessionEditPage() {
       maxAthletes: String(session.maxAthletes),
     });
     setExercises(
-      session.exercises.map((ex) => ({
+      session.exercises.map((ex: any) => ({
         id: ex.id,
         name: ex.name,
         sets: ex.sets != null ? String(ex.sets) : "",
@@ -120,6 +134,7 @@ export default function SessionEditPage() {
         durationSeconds: ex.durationSeconds != null ? String(ex.durationSeconds) : "",
         restSeconds: ex.restSeconds != null ? String(ex.restSeconds) : "",
         notes: ex.notes ?? "",
+        wodType: ex.wodType ?? "",
       }))
     );
     setAssignedIds(new Set(session.bookings.map((b) => b.athlete.id)));
@@ -159,6 +174,21 @@ export default function SessionEditPage() {
   const setExField = (i: number, k: string, v: string) =>
     setExercises((prev) => prev.map((ex, j) => j === i ? { ...ex, [k]: v } : ex));
 
+  // Derive sport metadata from the current dropdown selection
+  const selectedSportDef = SPORT_MAP[form.sport] ?? findSport(form.sport);
+
+  // Build the sport options: coach's configured sports + current session sport if not in list
+  const sportOptions = (() => {
+    const ids = new Set(coachSports);
+    const opts = coachSports.map((sid) => ({ id: sid, label: SPORT_MAP[sid]?.label ?? sid }));
+    // Add session's current sport as a fallback option if it's not in the coach's list
+    if (form.sport && !ids.has(form.sport)) {
+      const def = SPORT_MAP[form.sport] ?? findSport(form.sport);
+      opts.unshift({ id: form.sport, label: def?.label ?? form.sport });
+    }
+    return opts;
+  })();
+
   const handleSaveDetails = () => {
     setError("");
     update.mutate({
@@ -185,6 +215,7 @@ export default function SessionEditPage() {
         durationSeconds: ex.durationSeconds ? parseInt(ex.durationSeconds) : undefined,
         restSeconds: ex.restSeconds ? parseInt(ex.restSeconds) : undefined,
         notes: ex.notes || undefined,
+        wodType: ex.wodType || undefined,
       })),
     });
     setExercises((prev) => prev.filter((ex) => !ex.isNew));
@@ -233,7 +264,7 @@ export default function SessionEditPage() {
         </button>
         <div className="flex-1">
           <h1 className="text-txt font-bold text-2xl">{session.title}</h1>
-          <p className="text-txt3 text-xs mt-0.5">{session.sport}</p>
+          <p className="text-txt3 text-xs mt-0.5">{selectedSportDef?.label ?? session.sport}</p>
         </div>
         <span className={`text-xs rounded-full px-3 py-1 font-medium ${STATUS_STYLE[session.status] ?? ""}`}>
           {tStatus(session.status)}
@@ -257,12 +288,33 @@ export default function SessionEditPage() {
                 className="w-full bg-bg3 border border-bg5 rounded-xl px-4 py-2.5 text-txt text-sm outline-none focus:border-primary-light transition-colors placeholder-txt3 disabled:opacity-60"
                 value={form.title} onChange={(e) => setField("title", e.target.value)} />
             </div>
+
+            {/* Sport — dropdown from coach's sports */}
             <div>
               <label className="text-txt2 text-xs tracking-widest block mb-1.5">{t("sportLabelOptional")}</label>
-              <input disabled={isCancelled}
-                className="w-full bg-bg3 border border-bg5 rounded-xl px-4 py-2.5 text-txt text-sm outline-none focus:border-primary-light transition-colors placeholder-txt3 disabled:opacity-60"
-                value={form.sport} onChange={(e) => setField("sport", e.target.value)} />
+              {sportOptions.length > 0 ? (
+                <select disabled={isCancelled}
+                  className="w-full bg-bg3 border border-bg5 rounded-xl px-4 py-2.5 text-txt text-sm outline-none focus:border-primary-light transition-colors disabled:opacity-60"
+                  value={form.sport}
+                  onChange={(e) => {
+                    setField("sport", e.target.value);
+                    const newSport = SPORT_MAP[e.target.value];
+                    if (!newSport?.isWodCompatible) {
+                      setExercises((prev) => prev.map((ex) => ({ ...ex, wodType: "" })));
+                    }
+                  }}>
+                  <option value="">{t("sportPlaceholder")}</option>
+                  {sportOptions.map(({ id: sid, label }) => (
+                    <option key={sid} value={sid}>{label}</option>
+                  ))}
+                </select>
+              ) : (
+                <input disabled={isCancelled}
+                  className="w-full bg-bg3 border border-bg5 rounded-xl px-4 py-2.5 text-txt text-sm outline-none focus:border-primary-light transition-colors placeholder-txt3 disabled:opacity-60"
+                  value={form.sport} onChange={(e) => setField("sport", e.target.value)} />
+              )}
             </div>
+
             <div>
               <label className="text-txt2 text-xs tracking-widest block mb-1.5">{t("locationLabel")}</label>
               <input disabled={isCancelled}
@@ -307,92 +359,137 @@ export default function SessionEditPage() {
 
         {/* Exercises */}
         <div className="bg-bg2 border border-bg5 rounded-2xl p-5 shadow-sm">
-          <h2 className="text-txt font-bold text-sm mb-4">
+          <h2 className="text-txt font-bold text-sm mb-1">
             {t("exercises")}
             <span className="ml-2 text-txt3 font-normal text-xs">{t("exercisesSaved", { count: exercises.filter((e) => !e.isNew).length })}</span>
           </h2>
 
-          <div className="flex flex-col gap-3 mb-3">
-            {exercises.map((ex, i) => (
-              <div key={ex.id ?? `new-${i}`}
-                className={`border rounded-xl p-4 ${ex.isNew ? "bg-bg4 border-primary/20" : "bg-bg3 border-bg5"}`}>
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                    {i + 1}
-                  </div>
-                  <input
-                    className="flex-1 bg-bg2 border border-bg5 rounded-lg px-3 py-1.5 text-txt text-sm outline-none focus:border-primary-light transition-colors placeholder-txt3"
-                    placeholder={t("exerciseNamePlaceholder")} value={ex.name}
-                    onChange={(e) => setExField(i, "name", e.target.value)}
-                    disabled={!ex.isNew && !isCancelled ? false : isCancelled}
-                  />
-                  {!isCancelled && (
-                    <div className="relative">
-                      <button type="button"
-                        onClick={() => setPickerOpenAt(pickerOpenAt === i ? null : i)}
-                        className="w-8 h-8 flex items-center justify-center rounded-lg text-txt3 hover:text-primary hover:bg-primary/10 transition-colors"
-                        title="Pick from library">
-                        <BookOpen size={15} />
-                      </button>
-                      {pickerOpenAt === i && (
-                        <LibraryPicker
-                          onSelect={(name, sets, reps, durationSeconds, restSeconds, notes) => {
-                            setExField(i, "name", name);
-                            setExField(i, "sets", sets);
-                            setExField(i, "reps", reps);
-                            setExField(i, "durationSeconds", durationSeconds);
-                            setExField(i, "restSeconds", restSeconds);
-                            setExField(i, "notes", notes);
-                            setPickerOpenAt(null);
-                          }}
-                          onClose={() => setPickerOpenAt(null)}
+          {/* If sport has no exercise structure, show a hint */}
+          {form.sport && selectedSportDef && !selectedSportDef.hasExercises ? (
+            <p className="text-txt3 text-xs mt-1 mb-3 italic">{t("exercisesHiddenHint")}</p>
+          ) : (
+            <>
+              <div className="flex flex-col gap-3 mb-3 mt-3">
+                {exercises.map((ex, i) => {
+                  const fields: FieldConfig[] = getExerciseFields(selectedSportDef, ex.wodType);
+
+                  return (
+                    <div key={ex.id ?? `new-${i}`}
+                      className={`border rounded-xl p-4 ${ex.isNew ? "bg-bg4 border-primary/20" : "bg-bg3 border-bg5"}`}>
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                          {i + 1}
+                        </div>
+                        <input
+                          className="flex-1 bg-bg2 border border-bg5 rounded-lg px-3 py-1.5 text-txt text-sm outline-none focus:border-primary-light transition-colors placeholder-txt3"
+                          placeholder={t("exerciseNamePlaceholder")} value={ex.name}
+                          onChange={(e) => setExField(i, "name", e.target.value)}
+                          disabled={isCancelled}
+                        />
+                        {!isCancelled && (
+                          <div className="relative">
+                            <button type="button"
+                              onClick={() => setPickerOpenAt(pickerOpenAt === i ? null : i)}
+                              className="w-8 h-8 flex items-center justify-center rounded-lg text-txt3 hover:text-primary hover:bg-primary/10 transition-colors"
+                              title="Pick from library">
+                              <BookOpen size={15} />
+                            </button>
+                            {pickerOpenAt === i && (
+                              <LibraryPicker
+                                onSelect={(name, sets, reps, durationSeconds, restSeconds, notes) => {
+                                  setExField(i, "name", name);
+                                  setExField(i, "sets", sets);
+                                  setExField(i, "reps", reps);
+                                  setExField(i, "durationSeconds", durationSeconds);
+                                  setExField(i, "restSeconds", restSeconds);
+                                  setExField(i, "notes", notes);
+                                  setPickerOpenAt(null);
+                                }}
+                                onClose={() => setPickerOpenAt(null)}
+                              />
+                            )}
+                          </div>
+                        )}
+                        {ex.isNew ? (
+                          <span className="text-xs text-primary-light bg-bg4 border border-primary/20 rounded-full px-2 py-0.5">{tCommon("new")}</span>
+                        ) : !isCancelled && (
+                          <button type="button" onClick={() => handleDeleteExercise(ex.id!)}
+                            disabled={deleteExercise.isPending}
+                            className="text-txt3 hover:text-coral transition-colors">
+                            <X size={16} />
+                          </button>
+                        )}
+                      </div>
+
+                      {/* WOD type selector — only for WOD-compatible sports */}
+                      {selectedSportDef?.isWodCompatible && (
+                        <div className="mb-2">
+                          <label className="text-txt3 text-[10px] tracking-widest block mb-1">{t("wodTypeLabel")}</label>
+                          <div className="flex gap-1.5 flex-wrap">
+                            <button type="button"
+                              onClick={() => !isCancelled && setExField(i, "wodType", "")}
+                              disabled={isCancelled}
+                              className={`px-2.5 py-1 rounded-lg text-[10px] font-semibold border transition-colors disabled:opacity-60 ${!ex.wodType ? "bg-primary text-white border-primary" : "border-bg5 text-txt3 hover:border-primary/40"}`}>
+                              {t("wodTypeNone")}
+                            </button>
+                            {WOD_OPTIONS.map((opt) => (
+                              <button key={opt} type="button"
+                                onClick={() => !isCancelled && setExField(i, "wodType", opt)}
+                                disabled={isCancelled}
+                                className={`px-2.5 py-1 rounded-lg text-[10px] font-semibold border transition-colors disabled:opacity-60 ${ex.wodType === opt ? "bg-primary text-white border-primary" : "border-bg5 text-txt3 hover:border-primary/40"}`}>
+                                {opt === "FOR_TIME" ? "FOR TIME" : opt}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Context-aware exercise fields */}
+                      {fields.length > 0 && (
+                        <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${Math.min(fields.length, 4)}, 1fr)` }}>
+                          {fields.map(({ field, label, placeholder }) => (
+                            <div key={field}>
+                              <label className="text-txt3 text-[9px] tracking-widest block mb-0.5">{label}</label>
+                              <input type="number" min="0" disabled={isCancelled}
+                                className="w-full bg-bg2 border border-bg5 rounded-lg px-3 py-1.5 text-txt text-xs outline-none focus:border-primary-light transition-colors placeholder-txt3 disabled:opacity-60"
+                                placeholder={placeholder}
+                                value={ex[field as keyof ExerciseDraft] as string}
+                                onChange={(e) => setExField(i, field, e.target.value)} />
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Notes */}
+                      {(selectedSportDef?.hasExercises ?? true) && (
+                        <input disabled={isCancelled}
+                          className="mt-2 w-full bg-bg2 border border-bg5 rounded-lg px-3 py-1.5 text-txt text-xs outline-none focus:border-primary-light transition-colors placeholder-txt3 disabled:opacity-60"
+                          placeholder="Notes (optional)"
+                          value={ex.notes}
+                          onChange={(e) => setExField(i, "notes", e.target.value)}
                         />
                       )}
                     </div>
-                  )}
-                  {ex.isNew ? (
-                    <span className="text-xs text-primary-light bg-bg4 border border-primary/20 rounded-full px-2 py-0.5">{tCommon("new")}</span>
-                  ) : !isCancelled && (
-                    <button type="button" onClick={() => handleDeleteExercise(ex.id!)}
-                      disabled={deleteExercise.isPending}
-                      className="text-coral hover:bg-coral/10 rounded-lg p-1 transition-colors text-sm">
-                      ×
+                  );
+                })}
+              </div>
+
+              {!isCancelled && (
+                <div className="flex gap-3">
+                  <button type="button"
+                    onClick={() => setExercises((prev) => [...prev, { ...EMPTY_EXERCISE, isNew: true }])}
+                    className="flex-1 py-2.5 border border-dashed border-bg5 rounded-xl text-txt2 text-sm hover:border-primary-light hover:text-primary-light transition-colors">
+                    {t("addExercise")}
+                  </button>
+                  {exercises.some((e) => e.isNew) && (
+                    <button type="button" onClick={handleAddNewExercises} disabled={addExercises.isPending}
+                      className="bg-accent text-white rounded-xl px-4 py-2.5 text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-60">
+                      {addExercises.isPending ? t("savingDots") : t("saveNew")}
                     </button>
                   )}
                 </div>
-                <div className="grid grid-cols-4 gap-2">
-                  {[
-                    { k: "sets", placeholder: t("sets") },
-                    { k: "reps", placeholder: t("reps") },
-                    { k: "durationSeconds", placeholder: t("durationSeconds") },
-                    { k: "restSeconds", placeholder: t("restSeconds") },
-                  ].map(({ k, placeholder }) => (
-                    <input key={k} type="number" min="0"
-                      className="bg-bg2 border border-bg5 rounded-lg px-3 py-1.5 text-txt text-xs outline-none focus:border-primary-light transition-colors placeholder-txt3"
-                      placeholder={placeholder} value={ex[k as keyof ExerciseDraft] as string}
-                      onChange={(e) => setExField(i, k, e.target.value)}
-                      disabled={isCancelled}
-                    />
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {!isCancelled && (
-            <div className="flex gap-3">
-              <button type="button"
-                onClick={() => setExercises((prev) => [...prev, { name: "", sets: "", reps: "", durationSeconds: "", restSeconds: "", notes: "", isNew: true }])}
-                className="flex-1 py-2.5 border border-dashed border-bg5 rounded-xl text-txt2 text-sm hover:border-primary-light hover:text-primary-light transition-colors">
-                {t("addExercise")}
-              </button>
-              {exercises.some((e) => e.isNew) && (
-                <button type="button" onClick={handleAddNewExercises} disabled={addExercises.isPending}
-                  className="bg-accent text-white rounded-xl px-4 py-2.5 text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-60">
-                  {addExercises.isPending ? t("savingDots") : t("saveNew")}
-                </button>
               )}
-            </div>
+            </>
           )}
         </div>
 

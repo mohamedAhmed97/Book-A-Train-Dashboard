@@ -36,7 +36,7 @@ export const authRouter = router({
           name: input.name, email: input.email, passwordHash, role: input.role,
           ...(input.role === "ATHLETE"
             ? { athleteProfile: { create: { sport: input.sport } } }
-            : { coachProfile: { create: { sport: input.sport, athleteLimit: 5 } } }),
+            : { coachProfile: { create: { sports: input.sport ? [input.sport] : [], athleteLimit: 5 } } }),
         },
       });
       const token = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: "7d" });

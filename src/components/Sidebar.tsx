@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { LayoutDashboard, Users, CalendarDays, Plus, Bell, User, LogOut, Dumbbell, BookOpen } from "lucide-react";
+import { LayoutDashboard, Users, CalendarDays, Plus, Bell, User, LogOut, Dumbbell, BookOpen, ClipboardList } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "@/stores/auth";
 import { trpc } from "@/lib/trpc";
@@ -18,6 +18,7 @@ const NAV = [
   { href: "/dashboard/sessions", icon: CalendarDays, key: "sessions" },
   { href: "/dashboard/sessions/new", icon: Plus, key: "newSession" },
   { href: "/dashboard/workouts", icon: BookOpen, key: "workouts" },
+  { href: "/dashboard/tests", icon: ClipboardList, key: "tests" },
   { href: "/dashboard/notifications", icon: Bell, key: "notifications" },
   { href: "/dashboard/profile", icon: User, key: "profile" },
 ] as const;

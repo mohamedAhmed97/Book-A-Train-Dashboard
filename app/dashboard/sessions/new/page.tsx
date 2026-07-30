@@ -4,6 +4,11 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { BookOpen, X } from "lucide-react";
 import { trpc } from "@/lib/trpc";
+import {
+  SPORTS, SPORT_MAP, WOD_OPTIONS, WOD_FIELD_MAP, STRENGTH_FIELDS,
+  getExerciseFields, findSport,
+  type FieldConfig,
+} from "@/lib/sports";
 
 interface ExerciseDraft {
   name: string;
@@ -12,9 +17,12 @@ interface ExerciseDraft {
   durationSeconds: string;
   restSeconds: string;
   notes: string;
+  wodType: string;
 }
 
-const EMPTY_EXERCISE: ExerciseDraft = { name: "", sets: "", reps: "", durationSeconds: "", restSeconds: "", notes: "" };
+const EMPTY_EXERCISE: ExerciseDraft = {
+  name: "", sets: "", reps: "", durationSeconds: "", restSeconds: "", notes: "", wodType: "",
+};
 
 function LibraryPicker({ onSelect, onClose }: {
   onSelect: (ex: ExerciseDraft) => void;
@@ -55,6 +63,7 @@ function LibraryPicker({ onSelect, onClose }: {
                     durationSeconds: tmpl.durationSeconds != null ? String(tmpl.durationSeconds) : "",
                     restSeconds: tmpl.restSeconds != null ? String(tmpl.restSeconds) : "",
                     notes: tmpl.notes ?? "",
+                    wodType: "",
                   });
                   onClose();
                 }}>
@@ -75,6 +84,9 @@ export default function NewSessionPage() {
   const router = useRouter();
   const utils = trpc.useUtils();
   const { data: athletes } = trpc.athletes.list.useQuery();
+  const { data: profile } = trpc.profile.get.useQuery();
+
+  const coachSports: string[] = (profile?.coachProfile as any)?.sports ?? [];
 
   const [form, setForm] = useState({
     title: "", sport: "", description: "", location: "",
@@ -97,11 +109,14 @@ export default function NewSessionPage() {
   const removeExercise = (i: number) => setExercises((prev) => prev.filter((_, j) => j !== i));
 
   const fillFromLibrary = (i: number, draft: ExerciseDraft) => {
-    setExercises((prev) => prev.map((ex, j) => j === i ? { ...draft } : ex));
+    setExercises((prev) => prev.map((ex, j) => j === i ? { ...draft, wodType: ex.wodType } : ex));
   };
 
   const toggleAthlete = (id: string) =>
     setSelectedAthletes((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
+
+  // Derive sport metadata
+  const selectedSportDef = findSport(form.sport) ?? SPORT_MAP[form.sport];
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -133,6 +148,7 @@ export default function NewSessionPage() {
             durationSeconds: ex.durationSeconds ? parseInt(ex.durationSeconds) : undefined,
             restSeconds: ex.restSeconds ? parseInt(ex.restSeconds) : undefined,
             notes: ex.notes || undefined,
+            wodType: ex.wodType || undefined,
           })),
         });
       }
@@ -153,7 +169,8 @@ export default function NewSessionPage() {
   return (
     <div className="p-7 max-w-3xl">
       <div className="flex items-center gap-4 mb-7">
-        <button onClick={() => router.back()} aria-label={tCommon("back")} className="w-9 h-9 bg-bg3 border border-bg5 rounded-xl flex items-center justify-center text-txt2 hover:text-txt transition-colors">←</button>
+        <button onClick={() => router.back()} aria-label={tCommon("back")}
+          className="w-9 h-9 bg-bg3 border border-bg5 rounded-xl flex items-center justify-center text-txt2 hover:text-txt transition-colors">←</button>
         <h1 className="text-txt font-bold text-2xl">{t("newSession")}</h1>
       </div>
 
@@ -167,11 +184,37 @@ export default function NewSessionPage() {
               <input className="w-full bg-bg3 border border-bg5 rounded-xl px-4 py-2.5 text-txt text-sm outline-none focus:border-primary-light transition-colors placeholder-txt3"
                 placeholder={t("titlePlaceholder")} value={form.title} onChange={(e) => setField("title", e.target.value)} required />
             </div>
+
+            {/* Sport — dropdown from coach's sports */}
             <div>
               <label className="text-txt2 text-xs tracking-widest block mb-1.5">{t("sportLabel")}</label>
-              <input className="w-full bg-bg3 border border-bg5 rounded-xl px-4 py-2.5 text-txt text-sm outline-none focus:border-primary-light transition-colors placeholder-txt3"
-                placeholder={t("sportPlaceholder")} value={form.sport} onChange={(e) => setField("sport", e.target.value)} required />
+              {coachSports.length > 0 ? (
+                <select
+                  className="w-full bg-bg3 border border-bg5 rounded-xl px-4 py-2.5 text-txt text-sm outline-none focus:border-primary-light transition-colors"
+                  value={form.sport}
+                  onChange={(e) => {
+                    setField("sport", e.target.value);
+                    // Clear WOD types if new sport is not WOD-compatible
+                    const newSport = SPORT_MAP[e.target.value];
+                    if (!newSport?.isWodCompatible) {
+                      setExercises((prev) => prev.map((ex) => ({ ...ex, wodType: "" })));
+                    }
+                  }}
+                  required
+                >
+                  <option value="">{t("sportPlaceholder")}</option>
+                  {coachSports.map((sid) => {
+                    const s = SPORT_MAP[sid];
+                    return <option key={sid} value={sid}>{s?.label ?? sid}</option>;
+                  })}
+                </select>
+              ) : (
+                <div className="w-full bg-bg3 border border-bg5 rounded-xl px-4 py-2.5 text-txt3 text-sm">
+                  {t("noSportsConfigured")}
+                </div>
+              )}
             </div>
+
             <div>
               <label className="text-txt2 text-xs tracking-widest block mb-1.5">{t("locationLabel")}</label>
               <input className="w-full bg-bg3 border border-bg5 rounded-xl px-4 py-2.5 text-txt text-sm outline-none focus:border-primary-light transition-colors placeholder-txt3"
@@ -197,51 +240,100 @@ export default function NewSessionPage() {
 
         {/* Exercises */}
         <div className="bg-bg2 border border-bg5 rounded-2xl p-5">
-          <h2 className="text-txt font-bold text-sm mb-4">{t("exercises")}</h2>
-          <div className="flex flex-col gap-3 mb-3">
-            {exercises.map((ex, i) => (
-              <div key={i} className="bg-bg3 border border-bg5 rounded-xl p-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center text-white text-xs font-bold flex-shrink-0">{i + 1}</div>
-                  <input className="flex-1 bg-bg4 border border-bg5 rounded-lg px-3 py-1.5 text-txt text-sm outline-none focus:border-primary-light transition-colors placeholder-txt3"
-                    placeholder={t("exerciseNamePlaceholder")} value={ex.name} onChange={(e) => setExField(i, "name", e.target.value)} />
-                  {/* Library picker trigger */}
-                  <div className="relative">
-                    <button type="button"
-                      onClick={() => setPickerOpenAt(pickerOpenAt === i ? null : i)}
-                      className="w-8 h-8 flex items-center justify-center rounded-lg text-txt3 hover:text-primary hover:bg-primary/10 transition-colors"
-                      title="Pick from library">
-                      <BookOpen size={15} />
-                    </button>
-                    {pickerOpenAt === i && (
-                      <LibraryPicker
-                        onSelect={(draft) => fillFromLibrary(i, draft)}
-                        onClose={() => setPickerOpenAt(null)}
-                      />
-                    )}
-                  </div>
-                  <button type="button" onClick={() => removeExercise(i)} className="text-txt3 hover:text-coral transition-colors text-lg">
-                    <X size={16} />
-                  </button>
-                </div>
-                <div className="grid grid-cols-4 gap-2">
-                  {[
-                    { k: "sets", placeholder: t("sets") },
-                    { k: "reps", placeholder: t("reps") },
-                    { k: "durationSeconds", placeholder: t("durationSeconds") },
-                    { k: "restSeconds", placeholder: t("restSeconds") },
-                  ].map(({ k, placeholder }) => (
-                    <input key={k} type="number" min="0" className="bg-bg4 border border-bg5 rounded-lg px-3 py-1.5 text-txt text-xs outline-none focus:border-primary-light transition-colors placeholder-txt3"
-                      placeholder={placeholder} value={ex[k as keyof ExerciseDraft]} onChange={(e) => setExField(i, k, e.target.value)} />
-                  ))}
-                </div>
+          <h2 className="text-txt font-bold text-sm mb-1">{t("exercises")}</h2>
+
+          {/* If sport has no exercise structure, show a hint */}
+          {form.sport && selectedSportDef && !selectedSportDef.hasExercises ? (
+            <p className="text-txt3 text-xs mt-1 mb-3 italic">{t("exercisesHiddenHint")}</p>
+          ) : (
+            <>
+              <div className="flex flex-col gap-3 mb-3 mt-3">
+                {exercises.map((ex, i) => {
+                  const fields: FieldConfig[] = getExerciseFields(selectedSportDef, ex.wodType);
+
+                  return (
+                    <div key={i} className="bg-bg3 border border-bg5 rounded-xl p-4">
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center text-white text-xs font-bold flex-shrink-0">{i + 1}</div>
+                        <input
+                          className="flex-1 bg-bg4 border border-bg5 rounded-lg px-3 py-1.5 text-txt text-sm outline-none focus:border-primary-light transition-colors placeholder-txt3"
+                          placeholder={t("exerciseNamePlaceholder")} value={ex.name}
+                          onChange={(e) => setExField(i, "name", e.target.value)} />
+                        <div className="relative">
+                          <button type="button"
+                            onClick={() => setPickerOpenAt(pickerOpenAt === i ? null : i)}
+                            className="w-8 h-8 flex items-center justify-center rounded-lg text-txt3 hover:text-primary hover:bg-primary/10 transition-colors"
+                            title="Pick from library">
+                            <BookOpen size={15} />
+                          </button>
+                          {pickerOpenAt === i && (
+                            <LibraryPicker
+                              onSelect={(draft) => { fillFromLibrary(i, draft); setPickerOpenAt(null); }}
+                              onClose={() => setPickerOpenAt(null)}
+                            />
+                          )}
+                        </div>
+                        <button type="button" onClick={() => removeExercise(i)} className="text-txt3 hover:text-coral transition-colors">
+                          <X size={16} />
+                        </button>
+                      </div>
+
+                      {/* WOD type selector — only for WOD-compatible sports */}
+                      {selectedSportDef?.isWodCompatible && (
+                        <div className="mb-2">
+                          <label className="text-txt3 text-[10px] tracking-widest block mb-1">{t("wodTypeLabel")}</label>
+                          <div className="flex gap-1.5 flex-wrap">
+                            <button type="button"
+                              onClick={() => setExField(i, "wodType", "")}
+                              className={`px-2.5 py-1 rounded-lg text-[10px] font-semibold border transition-colors ${!ex.wodType ? "bg-primary text-white border-primary" : "border-bg5 text-txt3 hover:border-primary/40"}`}>
+                              {t("wodTypeNone")}
+                            </button>
+                            {WOD_OPTIONS.map((opt) => (
+                              <button key={opt} type="button"
+                                onClick={() => setExField(i, "wodType", opt)}
+                                className={`px-2.5 py-1 rounded-lg text-[10px] font-semibold border transition-colors ${ex.wodType === opt ? "bg-primary text-white border-primary" : "border-bg5 text-txt3 hover:border-primary/40"}`}>
+                                {opt === "FOR_TIME" ? "FOR TIME" : opt}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Context-aware exercise fields */}
+                      {fields.length > 0 && (
+                        <div className={`grid gap-2`} style={{ gridTemplateColumns: `repeat(${Math.min(fields.length, 4)}, 1fr)` }}>
+                          {fields.map(({ field, label, placeholder }) => (
+                            <div key={field}>
+                              <label className="text-txt3 text-[9px] tracking-widest block mb-0.5">{label}</label>
+                              <input type="number" min="0"
+                                className="w-full bg-bg4 border border-bg5 rounded-lg px-3 py-1.5 text-txt text-xs outline-none focus:border-primary-light transition-colors placeholder-txt3"
+                                placeholder={placeholder}
+                                value={ex[field as keyof ExerciseDraft]}
+                                onChange={(e) => setExField(i, field, e.target.value)} />
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Notes */}
+                      {(selectedSportDef?.hasExercises ?? true) && (
+                        <input
+                          className="mt-2 w-full bg-bg4 border border-bg5 rounded-lg px-3 py-1.5 text-txt text-xs outline-none focus:border-primary-light transition-colors placeholder-txt3"
+                          placeholder="Notes (optional)"
+                          value={ex.notes}
+                          onChange={(e) => setExField(i, "notes", e.target.value)}
+                        />
+                      )}
+                    </div>
+                  );
+                })}
               </div>
-            ))}
-          </div>
-          <button type="button" onClick={addExercise}
-            className="w-full py-2.5 border border-dashed border-bg4 rounded-xl text-txt2 text-sm hover:border-primary-light hover:text-txt transition-colors">
-            {t("addExercise")}
-          </button>
+              <button type="button" onClick={addExercise}
+                className="w-full py-2.5 border border-dashed border-bg4 rounded-xl text-txt2 text-sm hover:border-primary-light hover:text-txt transition-colors">
+                {t("addExercise")}
+              </button>
+            </>
+          )}
         </div>
 
         {/* Assign athletes */}
