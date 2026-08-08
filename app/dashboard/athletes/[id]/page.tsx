@@ -5,12 +5,15 @@ import { useTranslations } from "next-intl";
 import {
   ArrowLeft, Activity, Clock, Flame, Gauge, Waves, CheckCircle2, Circle,
   ChevronDown, ChevronUp, Timer, MapPin, FileText, CalendarDays, Dumbbell,
-  ClipboardList, X,
+  ClipboardList, X, HeartPulse, Droplets, TrendingUp, Moon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { trpc } from "@/lib/trpc";
+import { ZONE_COLORS, formatSeconds, type Zone } from "@/lib/vitals";
+import { formatMetricValue, metricMeta } from "@/lib/metricCatalog";
+import { metricStyle, metricLabel } from "@/lib/metricDisplay";
 
 const STATUS_STYLE: Record<string, string> = {
   SCHEDULED: "text-accent bg-accent/10 border border-accent/20",
@@ -163,6 +166,9 @@ export default function AthleteProfilePage() {
           accent="text-purple-500"
         />
       </div>
+
+      {/* Watch recovery — renders nothing when the athlete has no linked watch */}
+      <AthleteRecoverySection athleteProfileId={id} />
 
       {/* Sessions list */}
       <div className="bg-bg2 border border-bg5 rounded-2xl overflow-hidden">
@@ -344,6 +350,9 @@ export default function AthleteProfilePage() {
                       <p className="text-txt3 text-xs italic">{t("noWorkoutRecorded")}</p>
                     </div>
                   )}
+
+                  {/* Watch vitals — renders nothing when the session captured none */}
+                  <SessionVitalsSection bookingId={booking.id} />
 
                   {/* Exercise progress */}
                   {booking.session.exercises.length > 0 && (
@@ -602,6 +611,286 @@ export default function AthleteProfilePage() {
             })}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Day-by-day recovery picture from the athlete's watch, independent of any
+ * session — resting HR, HRV, sleep and whatever else their device reports.
+ *
+ * Renders nothing when the athlete has no linked watch, so a roster of mixed
+ * athletes doesn't show empty panels.
+ */
+function AthleteRecoverySection({ athleteProfileId }: { athleteProfileId: string }) {
+  const t = useTranslations("vitals");
+  const tMetric = useTranslations("vitals.metric");
+  const [days, setDays] = useState(14);
+  const { data = [] } = trpc.vitals.athleteDaily.useQuery(
+    { athleteProfileId, days },
+    { retry: false },
+  );
+
+  if (data.length === 0) return null;
+
+  const today = data[0] as { date: string; metrics: Record<string, { value: number; unit: string }> };
+  const todayKeys = Object.keys(today.metrics);
+
+  // Baseline is the mean of the *earlier* days, so today isn't compared to
+  // itself. Needs at least a couple of prior days to mean anything.
+  const baselineFor = (metric: string): number | null => {
+    const prior = data
+      .slice(1)
+      .map((d: { metrics: Record<string, { value: number }> }) => d.metrics[metric]?.value)
+      .filter((v: number | undefined): v is number => typeof v === "number");
+    if (prior.length < 2) return null;
+    return prior.reduce((sum: number, v: number) => sum + v, 0) / prior.length;
+  };
+
+  const sorted = todayKeys.sort(
+    (a, b) => metricMeta(a).group.localeCompare(metricMeta(b).group) || a.localeCompare(b),
+  );
+
+  return (
+    <div className="bg-bg2 border border-bg5 rounded-2xl p-5 mb-4">
+      <div className="flex items-center justify-between gap-3 mb-4">
+        <div className="flex items-center gap-2">
+          <Moon size={16} className="text-indigo-500" />
+          <p className="text-txt font-bold text-sm">{t("recoveryTitle")}</p>
+        </div>
+        <div className="flex items-center gap-1">
+          {[7, 14, 30].map((option) => (
+            <button
+              key={option}
+              onClick={() => setDays(option)}
+              className={`text-[10px] font-semibold px-2 py-1 rounded-md transition-colors ${
+                days === option ? "bg-bg4 text-txt" : "text-txt3 hover:text-txt2"
+              }`}
+            >
+              {t("lastDays", { days: option })}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+        {sorted.map((metric) => {
+          const reading = today.metrics[metric]!;
+          const baseline = baselineFor(metric);
+          const delta = baseline === null ? null : reading.value - baseline;
+          // A percentage of baseline reads better than a raw delta across
+          // metrics whose scales differ by orders of magnitude.
+          const deltaPct =
+            baseline === null || baseline === 0 ? null : ((delta ?? 0) / baseline) * 100;
+          const { icon: Icon, color } = metricStyle(metric);
+
+          return (
+            <div key={metric} className="bg-bg3 border border-bg5 rounded-xl px-3 py-2.5">
+              <div className="flex items-center gap-1.5 mb-1">
+                <Icon size={13} className={color} />
+                <span className="text-txt3 text-[10px] truncate">
+                  {metricLabel(tMetric, metric)}
+                </span>
+              </div>
+              <p className="text-txt font-semibold text-sm tabular-nums">
+                {formatMetricValue(metric, reading.value, reading.unit)}
+              </p>
+              {deltaPct !== null && Math.abs(deltaPct) >= 1 && (
+                <p
+                  className={`text-[10px] tabular-nums mt-0.5 ${
+                    deltaPct > 0 ? "text-emerald-500" : "text-orange-500"
+                  }`}
+                >
+                  {deltaPct > 0 ? "+" : ""}
+                  {deltaPct.toFixed(0)}% {t("vsBaseline")}
+                </p>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Watch vitals for one past session: averages plus the HR zone breakdown.
+ * Queried per expanded booking rather than eagerly with the athlete, so opening
+ * a profile doesn't pull the summary for every session in their history.
+ */
+function SessionVitalsSection({ bookingId }: { bookingId: string }) {
+  const t = useTranslations("vitals");
+  const { data } = trpc.vitals.sessionVitals.useQuery({ bookingId }, { retry: false });
+
+  const summary = data?.summary;
+  const metricSummaries = data?.metricSummaries ?? [];
+  if (!summary || summary.sampleCount === 0) return null;
+
+  // Metrics already shown as headline tiles below; the rest go in the grid so
+  // nothing the watch captured is hidden from the coach.
+  const HEADLINE = new Set(["HEART_RATE", "SPO2", "HRV"]);
+  const extras = metricSummaries.filter(
+    (m: { metric: string }) => !HEADLINE.has(m.metric),
+  );
+
+  const zones: Array<{ zone: Zone; seconds: number }> = [
+    { zone: 1, seconds: summary.zone1Sec },
+    { zone: 2, seconds: summary.zone2Sec },
+    { zone: 3, seconds: summary.zone3Sec },
+    { zone: 4, seconds: summary.zone4Sec },
+    { zone: 5, seconds: summary.zone5Sec },
+  ];
+  const totalZoneSec = zones.reduce((sum, z) => sum + z.seconds, 0);
+
+  return (
+    <div className="px-5 pt-4 pb-4 border-b border-bg5">
+      <p className="text-txt3 text-[10px] tracking-widest font-bold mb-4">
+        {t("sectionTitle").toUpperCase()}
+      </p>
+
+      <div className="flex flex-wrap gap-6">
+        {summary.avgHeartRate != null && (
+          <MetricTile
+            icon={<HeartPulse size={18} className="text-red-500" />}
+            label={t("avgHr")}
+            value={`${summary.avgHeartRate} bpm`}
+            bg="bg-red-500/10"
+          />
+        )}
+        {summary.maxHeartRate != null && (
+          <MetricTile
+            icon={<TrendingUp size={18} className="text-orange-500" />}
+            label={t("maxHr")}
+            value={`${summary.maxHeartRate} bpm`}
+            bg="bg-orange-500/10"
+          />
+        )}
+        {summary.avgSpo2 != null && (
+          <MetricTile
+            icon={<Droplets size={18} className="text-sky-500" />}
+            label={t("avgSpo2")}
+            value={`${summary.avgSpo2}%`}
+            bg="bg-sky-500/10"
+          />
+        )}
+        {summary.avgHrvMs != null && (
+          <MetricTile
+            icon={<Waves size={18} className="text-purple-500" />}
+            label={t("avgHrv")}
+            value={`${summary.avgHrvMs} ms`}
+            bg="bg-purple-500/10"
+          />
+        )}
+      </div>
+
+      {totalZoneSec > 0 && (
+        <div className="mt-5">
+          <p className="text-txt3 text-[10px] tracking-widest font-bold mb-2.5">
+            {t("zones").toUpperCase()}
+          </p>
+
+          {/* Proportion of the session spent in each zone */}
+          <div className="flex h-2.5 rounded-full overflow-hidden mb-3">
+            {zones.map(({ zone, seconds }) =>
+              seconds > 0 ? (
+                <div key={zone} style={{ flex: seconds, backgroundColor: ZONE_COLORS[zone] }} />
+              ) : null,
+            )}
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            {zones
+              .filter((z) => z.seconds > 0)
+              .reverse()
+              .map(({ zone, seconds }) => (
+                <div key={zone} className="flex items-center gap-2">
+                  <span
+                    className="h-2 w-2 rounded-full flex-shrink-0"
+                    style={{ backgroundColor: ZONE_COLORS[zone] }}
+                  />
+                  <span className="text-txt2 text-xs flex-1">{t("zone", { zone })}</span>
+                  <span className="text-txt font-semibold text-xs tabular-nums">
+                    {formatSeconds(seconds)}
+                  </span>
+                  <span className="text-txt3 text-[10px] w-9 text-end tabular-nums">
+                    {Math.round((seconds / totalZoneSec) * 100)}%
+                  </span>
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
+
+      {extras.length > 0 && <SessionMetricGrid metrics={extras} />}
+    </div>
+  );
+}
+
+/**
+ * Everything else the watch recorded during the session, one tile per metric.
+ *
+ * Driven entirely by what's in the data — a metric this build has never heard
+ * of still lands here with a humanised label and a generic icon, rather than
+ * being silently dropped for not matching a hardcoded list.
+ */
+function SessionMetricGrid({
+  metrics,
+}: {
+  metrics: Array<{
+    metric: string;
+    unit: string;
+    min: number;
+    max: number;
+    avg: number;
+    sum: number;
+    last: number;
+    count: number;
+  }>;
+}) {
+  const t = useTranslations("vitals");
+  const tMetric = useTranslations("vitals.metric");
+
+  const sorted = [...metrics].sort(
+    (a, b) =>
+      metricMeta(a.metric).group.localeCompare(metricMeta(b.metric).group) ||
+      a.metric.localeCompare(b.metric),
+  );
+
+  return (
+    <div className="mt-5">
+      <p className="text-txt3 text-[10px] tracking-widest font-bold mb-2.5">
+        {t("allMetrics").toUpperCase()}
+      </p>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+        {sorted.map((m) => {
+          const spec = metricMeta(m.metric, m.unit);
+          // Each metric collapses the way it makes sense to: a total for
+          // counters, the latest reading for body measurements, a mean for
+          // rates.
+          const value = spec.agg === "sum" ? m.sum : spec.agg === "last" ? m.last : m.avg;
+          const { icon: Icon, color } = metricStyle(m.metric);
+          return (
+            <div key={m.metric} className="bg-bg3 border border-bg5 rounded-xl px-3 py-2.5">
+              <div className="flex items-center gap-1.5 mb-1">
+                <Icon size={13} className={color} />
+                <span className="text-txt3 text-[10px] truncate">
+                  {metricLabel(tMetric, m.metric)}
+                </span>
+              </div>
+              <p className="text-txt font-semibold text-sm tabular-nums">
+                {formatMetricValue(m.metric, value, m.unit)}
+              </p>
+              {/* Range is only meaningful for metrics we averaged. */}
+              {spec.agg === "avg" && m.count > 1 && (
+                <p className="text-txt3 text-[10px] tabular-nums mt-0.5">
+                  {formatMetricValue(m.metric, m.min, m.unit)} –{" "}
+                  {formatMetricValue(m.metric, m.max, m.unit)}
+                </p>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

@@ -11,6 +11,7 @@ import { friendsRouter } from "./routers/friends";
 import { workoutTemplatesRouter } from "./routers/workoutTemplates";
 import { testsRouter } from "./routers/tests";
 import { customTestsRouter } from "./routers/customTests";
+import { vitalsRouter } from "./routers/vitals";
 
 export const appRouter = router({
   auth: authRouter,
@@ -25,6 +26,7 @@ export const appRouter = router({
   workoutTemplates: workoutTemplatesRouter,
   tests: testsRouter,
   customTests: customTestsRouter,
+  vitals: vitalsRouter,
 });
 
 export type AppRouter = typeof appRouter;

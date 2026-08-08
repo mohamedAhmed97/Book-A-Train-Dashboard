@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { LayoutDashboard, Users, CalendarDays, Plus, Bell, User, LogOut, Dumbbell, BookOpen, ClipboardList } from "lucide-react";
+import { LayoutDashboard, Users, CalendarDays, Plus, Bell, User, LogOut, Dumbbell, BookOpen, ClipboardList, HeartPulse } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "@/stores/auth";
 import { trpc } from "@/lib/trpc";
@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 const NAV = [
   { href: "/dashboard", icon: LayoutDashboard, key: "dashboard" },
   { href: "/dashboard/athletes", icon: Users, key: "athletes" },
+  { href: "/dashboard/live", icon: HeartPulse, key: "live" },
   { href: "/dashboard/sessions", icon: CalendarDays, key: "sessions" },
   { href: "/dashboard/sessions/new", icon: Plus, key: "newSession" },
   { href: "/dashboard/workouts", icon: BookOpen, key: "workouts" },
